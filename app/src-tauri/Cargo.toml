@@ -1,0 +1,74 @@
+[package]
+name = "hyperbox-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "HyperBox Desktop Application"
+license = "MIT OR Apache-2.0"
+authors = ["HyperBox Contributors"]
+
+[lib]
+name = "hyperbox_desktop"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+# Tauri
+tauri = { version = "2.0", features = [
+  "tray-icon",
+  "image-png",
+  "image-ico"
+] }
+tauri-plugin-shell = "2.0"
+tauri-plugin-notification = "2.0"
+tauri-plugin-dialog = "2.0"
+tauri-plugin-fs = "2.0"
+tauri-plugin-process = "2.0"
+tauri-plugin-clipboard-manager = "2.0"
+tauri-plugin-os = "2.0"
+tauri-plugin-single-instance = "2.0"
+tauri-plugin-window-state = "2.0"
+tauri-plugin-log = "2.0"
+tauri-plugin-updater = "2.0"
+
+# HyperBox crates
+hyperbox-core = { path = "../../crates/hyperbox-core" }
+hyperbox-project = { path = "../../crates/hyperbox-project" }
+hyperbox-optimize = { path = "../../crates/hyperbox-optimize" }
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP client for daemon communication
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+log = "0.4"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+parking_lot = "0.12"
+dirs = "6.0"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+opt-level = "z"

@@ -1,0 +1,57 @@
+[package]
+name = "hyperbox-cli"
+version = "0.1.0"
+edition = "2021"
+description = "HyperBox command-line interface"
+license = "MIT OR Apache-2.0"
+authors = ["HyperBox Contributors"]
+
+[[bin]]
+name = "hb"
+path = "src/main.rs"
+
+[dependencies]
+hyperbox-core = { path = "../hyperbox-core" }
+hyperbox-project = { path = "../hyperbox-project" }
+hyperbox-optimize = { path = "../hyperbox-optimize" }
+
+# CLI framework
+clap = { version = "4.4", features = ["derive", "env", "wrap_help", "color"] }
+clap_complete = "4.4"
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Utilities
+uuid = { version = "1.7", features = ["v4"] }
+
+# Terminal UI
+console = "0.15"
+indicatif = "0.17"
+dialoguer = "0.11"
+tabled = "0.15"
+colored = "2.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+humansize = "2.1"
+dirs = "5.0"
+ctrlc = "3.4"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.0"
+tempfile = "3.9"

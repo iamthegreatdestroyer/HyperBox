@@ -1,0 +1,51 @@
+[package]
+name = "hyperbox-optimize"
+version = "0.1.0"
+edition = "2021"
+description = "Sub-linear performance optimizations for HyperBox"
+license = "MIT OR Apache-2.0"
+authors = ["HyperBox Contributors"]
+
+[dependencies]
+hyperbox-core = { path = "../hyperbox-core" }
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Concurrent data structures
+dashmap = "5.5"
+parking_lot = "0.12"
+
+# Prediction & ML
+rand = "0.8"
+
+# Hashing & compression
+sha2 = "0.10"
+zstd = "0.13"
+lz4_flex = "0.11"
+
+# Error handling
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+bytes = "1.5"
+reqwest = { version = "0.11", features = ["json", "stream"] }
+which = "6.0"
+tempfile = "3.9"
+
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = "0.5"
+
+[[bench]]
+name = "optimize_benchmarks"
+harness = false

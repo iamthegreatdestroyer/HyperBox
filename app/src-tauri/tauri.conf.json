@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "HyperBox",
+  "version": "0.1.0",
+  "identifier": "com.hyperbox.app",
+  "build": {
+    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run dev",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'self' http://127.0.0.1:8080 ws://127.0.0.1:8080",
+        "img-src": "'self' data: https:",
+        "style-src": "'self' 'unsafe-inline'"
+      }
+    },
+    "windows": [
+      {
+        "title": "HyperBox",
+        "label": "main",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "center": true,
+        "focus": true
+      }
+    ],
+    "trayIcon": {
+      "id": "main-tray",
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "HyperBox",
+    "category": "DeveloperTool",
+    "shortDescription": "20x faster Docker Desktop replacement",
+    "longDescription": "HyperBox is a revolutionary container management platform featuring project-centric isolation, sub-linear optimizations, and instant warm starts.",
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      }
+    },
+    "macOS": {
+      "entitlements": null,
+      "signingIdentity": null,
+      "minimumSystemVersion": "10.15"
+    },
+    "linux": {
+      "deb": {
+        "depends": ["crun"]
+      },
+      "rpm": {
+        "depends": ["crun"]
+      }
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}

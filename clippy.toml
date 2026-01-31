@@ -1,0 +1,48 @@
+# HyperBox Clippy Configuration
+# Performance thresholds
+too-many-arguments-threshold = 8
+too-many-lines-threshold = 150
+type-complexity-threshold = 300
+
+# Cognitive complexity
+cognitive-complexity-threshold = 25
+
+# Enum variant limits
+enum-variant-name-threshold = 3
+enum-variant-size-threshold = 200
+
+# Documentation
+doc-valid-idents = ["HyperBox", "cgroups", "eBPF", "eStargz", "CRIU", "CNI", "OCI", "gRPC"]
+
+# Disallowed methods (security-sensitive)
+disallowed-methods = [
+    { path = "std::env::set_var", reason = "Use configuration system instead" },
+    { path = "std::process::exit", reason = "Return Result instead of exiting" },
+]
+
+# Disallowed types
+disallowed-types = [
+    { path = "std::sync::Mutex", reason = "Use parking_lot::Mutex for better performance" },
+    { path = "std::sync::RwLock", reason = "Use parking_lot::RwLock for better performance" },
+]
+
+# Allowed wildcard imports (for internal modules only)
+warn-on-all-wildcard-imports = true
+
+# MSRV
+msrv = "1.75.0"
+
+# Avoid trivial regex
+trivial-copy-size-limit = 16
+
+# Large stack frames
+stack-size-threshold = 512000
+
+# Single char binding names allowed in specific contexts
+single-char-binding-names-threshold = 5
+
+# Literal representation
+literal-representation-threshold = 4
+
+# Vector initialization
+vec-box-size-threshold = 4096
