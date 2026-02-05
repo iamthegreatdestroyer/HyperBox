@@ -3,7 +3,7 @@
 use crate::state::{DaemonState, EventType};
 use std::time::Duration;
 use sysinfo::System;
-use tracing::{info, warn};
+use tracing::warn;
 
 /// Monitor daemon health.
 pub async fn monitor(state: DaemonState) -> anyhow::Result<()> {

@@ -2,6 +2,7 @@
 
 use clap::{Parser, Subcommand};
 
+pub mod compat;
 pub mod completion;
 pub mod container;
 pub mod image;
@@ -28,6 +29,7 @@ Examples:
   hb project start           Start project containers
   hb container list          List all containers
   hb image pull nginx        Pull an image
+  hb docker run nginx        Docker-compatible mode
 "#)]
 pub struct Cli {
     /// Verbose output (-v, -vv, -vvv)
@@ -71,4 +73,8 @@ pub enum Commands {
 
     /// Generate shell completions
     Completion(completion::CompletionCommand),
+
+    /// Docker CLI compatibility mode
+    #[command(alias = "d")]
+    Docker(compat::DockerCommand),
 }

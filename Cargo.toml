@@ -7,6 +7,7 @@ members = [
     "crates/hyperbox-cli",
     "crates/hyperbox-daemon",
     "app/src-tauri",
+    "tests",
 ]
 
 [workspace.package]

@@ -1,6 +1,5 @@
 //! Linux namespace management.
 
-use crate::error::{CoreError, Result};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -45,7 +44,7 @@ impl NamespaceType {
     #[cfg(unix)]
     #[must_use]
     pub fn clone_flag(&self) -> i32 {
-        use libc::*;
+        use nix::libc::*;
         match self {
             Self::Mount => CLONE_NEWNS,
             Self::Uts => CLONE_NEWUTS,

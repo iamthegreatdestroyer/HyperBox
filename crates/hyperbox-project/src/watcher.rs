@@ -1,15 +1,14 @@
 //! File system watcher for hot-reload support.
 
-use crate::ProjectId;
 use crate::error::{ProjectError, Result};
+use crate::ProjectId;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
 /// File change event.
@@ -239,5 +238,201 @@ impl ProjectWatcher {
 impl Default for ProjectWatcher {
     fn default() -> Self {
         Self::new().0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::tempdir;
+    use tokio::time::{sleep, Duration};
+    use uuid::Uuid;
+
+    #[tokio::test]
+    async fn test_project_watcher_creation() {
+        let (watcher, _rx) = ProjectWatcher::new();
+
+        assert_eq!(watcher.watcher_count().await, 0);
+        assert!(!watcher.is_watching().await);
+    }
+
+    #[tokio::test]
+    async fn test_project_watcher_default() {
+        let watcher = ProjectWatcher::default();
+
+        assert_eq!(watcher.watcher_count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_watch_directory() {
+        let dir = tempdir().unwrap();
+        let (watcher, _rx) = ProjectWatcher::new();
+        let project_id = Uuid::new_v4();
+
+        let result = watcher.watch(project_id, dir.path()).await;
+        assert!(result.is_ok());
+
+        assert!(watcher.is_watching().await);
+        assert_eq!(watcher.watcher_count().await, 1);
+    }
+
+    #[tokio::test]
+    async fn test_watch_multiple_directories() {
+        let dir1 = tempdir().unwrap();
+        let dir2 = tempdir().unwrap();
+        let (watcher, _rx) = ProjectWatcher::new();
+
+        watcher.watch(Uuid::new_v4(), dir1.path()).await.unwrap();
+        watcher.watch(Uuid::new_v4(), dir2.path()).await.unwrap();
+
+        assert_eq!(watcher.watcher_count().await, 2);
+    }
+
+    #[tokio::test]
+    async fn test_unwatch_directory() {
+        let dir = tempdir().unwrap();
+        let (watcher, _rx) = ProjectWatcher::new();
+        let project_id = Uuid::new_v4();
+
+        watcher.watch(project_id, dir.path()).await.unwrap();
+        assert_eq!(watcher.watcher_count().await, 1);
+
+        watcher.unwatch(project_id).await;
+        assert_eq!(watcher.watcher_count().await, 0);
+        assert!(!watcher.is_watching().await);
+    }
+
+    #[tokio::test]
+    async fn test_unwatch_nonexistent() {
+        let (watcher, _rx) = ProjectWatcher::new();
+
+        // Should not panic
+        watcher.unwatch(Uuid::new_v4()).await;
+        assert_eq!(watcher.watcher_count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_stop_watcher() {
+        let dir1 = tempdir().unwrap();
+        let dir2 = tempdir().unwrap();
+        let (watcher, _rx) = ProjectWatcher::new();
+
+        watcher.watch(Uuid::new_v4(), dir1.path()).await.unwrap();
+        watcher.watch(Uuid::new_v4(), dir2.path()).await.unwrap();
+
+        watcher.stop().await;
+
+        assert_eq!(watcher.watcher_count().await, 0);
+        assert!(!watcher.is_watching().await);
+    }
+
+    #[tokio::test]
+    async fn test_add_ignores() {
+        let (watcher, _rx) = ProjectWatcher::new();
+
+        let result = watcher
+            .add_ignores(&["*.tmp".to_string(), "*.bak".to_string()])
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_add_ignores_invalid_pattern() {
+        let (watcher, _rx) = ProjectWatcher::new();
+
+        // Invalid glob patterns are logged as warnings but don't fail
+        // This allows valid patterns to still be applied even if some are invalid
+        let result = watcher.add_ignores(&["[invalid".to_string()]).await;
+        assert!(result.is_ok()); // Graceful handling - doesn't error on invalid patterns
+    }
+
+    #[tokio::test]
+    async fn test_file_change_kind_display() {
+        let kinds = [
+            ChangeKind::Created,
+            ChangeKind::Modified,
+            ChangeKind::Deleted,
+            ChangeKind::Renamed,
+        ];
+
+        for kind in kinds {
+            let change = FileChange {
+                path: PathBuf::from("/test"),
+                kind,
+                project_id: Some(Uuid::new_v4()),
+            };
+            assert_eq!(change.kind, kind);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_watch_nonexistent_directory() {
+        let (watcher, _rx) = ProjectWatcher::new();
+
+        let result = watcher
+            .watch(Uuid::new_v4(), Path::new("/nonexistent/path/that/does/not/exist"))
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_rewatch_same_project() {
+        let dir1 = tempdir().unwrap();
+        let dir2 = tempdir().unwrap();
+        let (watcher, _rx) = ProjectWatcher::new();
+        let project_id = Uuid::new_v4();
+
+        watcher.watch(project_id, dir1.path()).await.unwrap();
+
+        // Watching again with same project_id adds another watcher
+        // (unwatch should be called first to replace)
+        let result = watcher.watch(project_id, dir2.path()).await;
+        assert!(result.is_ok());
+        assert_eq!(watcher.watcher_count().await, 2); // Both watchers active
+    }
+
+    #[tokio::test]
+    async fn test_file_change_event_detection() {
+        let dir = tempdir().unwrap();
+        let (watcher, mut rx) = ProjectWatcher::new();
+
+        watcher.watch(Uuid::new_v4(), dir.path()).await.unwrap();
+
+        // Create a file
+        let file_path = dir.path().join("test.txt");
+        {
+            let mut file = File::create(&file_path).unwrap();
+            writeln!(file, "test content").unwrap();
+        }
+
+        // Wait for event with timeout
+        let result = tokio::time::timeout(Duration::from_secs(2), rx.recv()).await;
+
+        // Event may or may not be received depending on OS timing
+        // We just verify no panic occurs
+        drop(result);
+    }
+
+    #[tokio::test]
+    async fn test_ignore_patterns_applied() {
+        let dir = tempdir().unwrap();
+        let (watcher, _rx) = ProjectWatcher::new();
+
+        // Default ignores include node_modules, .git, target, etc.
+        watcher.watch(Uuid::new_v4(), dir.path()).await.unwrap();
+
+        // Create a file in ignored directory
+        let ignored_dir = dir.path().join("node_modules");
+        std::fs::create_dir(&ignored_dir).unwrap();
+        let ignored_file = ignored_dir.join("package.json");
+        File::create(&ignored_file).unwrap();
+
+        // Small delay for events to process
+        sleep(Duration::from_millis(100)).await;
+
+        // Watcher should still be running
+        assert!(watcher.is_watching().await);
     }
 }

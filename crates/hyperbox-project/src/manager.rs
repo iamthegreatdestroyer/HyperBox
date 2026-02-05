@@ -1,17 +1,17 @@
 //! Project manager - core orchestration of project lifecycle.
 
-use crate::config::ProjectConfig;
 use crate::detection::ProjectDetector;
 use crate::error::{ProjectError, Result};
+use crate::orchestration::ProjectOrchestrator;
 use crate::ports::ProjectPortManager;
 use crate::resources::ResourcePool;
 use crate::{Project, ProjectId, ProjectState};
 use dashmap::DashMap;
-use hyperbox_core::types::ContainerId;
+use hyperbox_core::runtime::ContainerRuntime;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 /// Project manager for orchestrating project lifecycles.
 pub struct ProjectManager {
@@ -27,10 +27,12 @@ pub struct ProjectManager {
     data_dir: PathBuf,
     /// Shutdown signal
     shutdown: Arc<RwLock<bool>>,
+    /// Container runtime orchestrator (optional - for when runtime is available)
+    orchestrator: Option<ProjectOrchestrator>,
 }
 
 impl ProjectManager {
-    /// Create a new project manager.
+    /// Create a new project manager without a runtime.
     pub fn new(data_dir: impl Into<PathBuf>) -> Self {
         let data_dir = data_dir.into();
 
@@ -41,7 +43,28 @@ impl ProjectManager {
             resource_pool: Arc::new(ResourcePool::new()),
             data_dir,
             shutdown: Arc::new(RwLock::new(false)),
+            orchestrator: None,
         }
+    }
+
+    /// Create a new project manager with a container runtime.
+    pub fn with_runtime(data_dir: impl Into<PathBuf>, runtime: Arc<dyn ContainerRuntime>) -> Self {
+        let data_dir = data_dir.into();
+
+        Self {
+            projects: DashMap::new(),
+            path_index: DashMap::new(),
+            port_manager: Arc::new(ProjectPortManager::new()),
+            resource_pool: Arc::new(ResourcePool::new()),
+            data_dir,
+            shutdown: Arc::new(RwLock::new(false)),
+            orchestrator: Some(ProjectOrchestrator::new(runtime)),
+        }
+    }
+
+    /// Set the container runtime after construction.
+    pub fn set_runtime(&mut self, runtime: Arc<dyn ContainerRuntime>) {
+        self.orchestrator = Some(ProjectOrchestrator::new(runtime));
     }
 
     /// Initialize the project manager.
@@ -202,19 +225,28 @@ impl ProjectManager {
     async fn start_containers(&self, id: ProjectId) -> Result<()> {
         let project = self.projects
             .get(&id)
-            .ok_or_else(|| ProjectError::NotFound(id.to_string()))?;
+            .ok_or_else(|| ProjectError::NotFound(id.to_string()))?
+            .clone();
 
-        for container_def in &project.config.containers {
-            debug!("Starting container: {}", container_def.name);
+        if let Some(ref orchestrator) = self.orchestrator {
+            // Use the real orchestrator to create and start containers
+            let container_ids = orchestrator.start_project(&project).await?;
 
-            // Would use hyperbox-core runtime here
-            // For now, just log
-            info!("Container {} started on ports {:?}",
-                container_def.name,
-                container_def.ports.iter()
-                    .filter_map(|p| p.host)
-                    .collect::<Vec<_>>()
-            );
+            // Update project with container IDs
+            if let Some(mut p) = self.projects.get_mut(&id) {
+                p.containers = container_ids;
+            }
+        } else {
+            // No runtime available - log only (for testing/UI-only mode)
+            for container_def in &project.config.containers {
+                warn!("No runtime available - simulating container start: {}", container_def.name);
+                info!("Container {} would start on ports {:?}",
+                    container_def.name,
+                    container_def.ports.iter()
+                        .filter_map(|p| p.host)
+                        .collect::<Vec<_>>()
+                );
+            }
         }
 
         Ok(())
@@ -239,10 +271,15 @@ impl ProjectManager {
         let container_ids = project.containers.clone();
         drop(project);
 
-        // Stop containers
-        for container_id in container_ids {
-            debug!("Stopping container: {}", container_id);
-            // Would use hyperbox-core runtime here
+        // Stop containers using orchestrator if available
+        if let Some(ref orchestrator) = self.orchestrator {
+            orchestrator.stop_project(&container_ids).await?;
+            orchestrator.remove_containers(&container_ids).await?;
+        } else {
+            // No runtime - just log
+            for container_id in &container_ids {
+                warn!("No runtime available - simulating container stop: {}", container_id);
+            }
         }
 
         // Update state

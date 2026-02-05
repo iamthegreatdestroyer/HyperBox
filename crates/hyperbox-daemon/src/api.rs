@@ -1,15 +1,20 @@
 //! HTTP/REST API server.
 
-use crate::state::{ContainerState, DaemonState, EventType};
+use crate::state::{ContainerState, DaemonState, EventType, ImageState};
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{
+        sse::{Event, KeepAlive, Sse},
+        IntoResponse,
+    },
     routing::{delete, get, post},
+    Json, Router,
 };
+use futures::stream::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{convert::Infallible, path::PathBuf, time::Duration};
+use tokio::io::AsyncBufReadExt;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::info;
@@ -52,6 +57,7 @@ pub fn create_router(state: DaemonState) -> Router {
         .route("/api/v1/containers/:id/checkpoint", post(checkpoint_container))
         .route("/api/v1/containers/:id/restore", post(restore_container))
         .route("/api/v1/containers/:id/logs", get(container_logs))
+        .route("/api/v1/containers/:id/logs/stream", get(container_logs_stream))
         .route("/api/v1/containers/:id/stats", get(container_stats))
         // Images
         .route("/api/v1/images", get(list_images))
@@ -238,18 +244,94 @@ async fn create_container(
     State(state): State<DaemonState>,
     Json(req): Json<CreateContainerRequest>,
 ) -> impl IntoResponse {
-    // Would create container here
-    let id = uuid::Uuid::new_v4().to_string()[..12].to_string();
+    // Build container spec
+    let mut spec = hyperbox_core::types::ContainerSpec::builder().image(&req.image);
 
-    state.emit(EventType::ContainerCreate, &id, serde_json::json!({"image": req.image}));
+    if let Some(ref name) = req.name {
+        spec = spec.name(name);
+    }
 
-    (
-        StatusCode::CREATED,
-        Json(ApiResponse::success(serde_json::json!({
-            "id": id,
-            "status": "created"
-        }))),
-    )
+    if let Some(ref cmd) = req.command {
+        if !cmd.is_empty() {
+            spec = spec.command(cmd.clone());
+        }
+    }
+
+    if let Some(ref env_vars) = req.env {
+        for env_var in env_vars {
+            if let Some((key, value)) = env_var.split_once('=') {
+                spec = spec.env(key.to_string(), value.to_string());
+            }
+        }
+    }
+
+    if let Some(ref port_mappings) = req.ports {
+        for port in port_mappings {
+            spec = spec.port(port.host, port.container);
+        }
+    }
+
+    let container_spec = spec.build();
+
+    state.emit(
+        EventType::ContainerCreate,
+        "",
+        serde_json::json!({"image": req.image, "status": "creating"}),
+    );
+
+    // Create container via runtime
+    match state.runtime.create(container_spec).await {
+        Ok(container_id) => {
+            let id_str = container_id.to_string();
+
+            // Add to daemon state
+            let container_state = ContainerState {
+                id: id_str.clone(),
+                name: req.name.clone().unwrap_or_else(|| id_str[..12].to_string()),
+                image: req.image.clone(),
+                status: crate::state::ContainerStatus::Created,
+                project_id: None,
+                ports: vec![],
+                created_at: chrono::Utc::now(),
+                started_at: None,
+                pid: None,
+                has_checkpoint: false,
+                is_prewarmed: false,
+            };
+            state.containers.insert(id_str.clone(), container_state);
+
+            state.emit(
+                EventType::ContainerCreate,
+                &id_str,
+                serde_json::json!({"image": req.image, "status": "created"}),
+            );
+
+            (
+                StatusCode::CREATED,
+                Json(ApiResponse::success(serde_json::json!({
+                    "id": id_str,
+                    "status": "created"
+                }))),
+            )
+        }
+        Err(e) => {
+            state.emit(
+                EventType::ContainerCreate,
+                "",
+                serde_json::json!({"status": "error", "error": e.to_string()}),
+            );
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse {
+                    success: false,
+                    data: Some(
+                        serde_json::json!({"error": format!("Failed to create container: {}", e)}),
+                    ),
+                    error: Some(format!("Failed to create container: {}", e)),
+                }),
+            )
+        }
+    }
 }
 
 async fn get_container(
@@ -281,31 +363,156 @@ async fn start_container(
     State(state): State<DaemonState>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    state.emit(EventType::ContainerStart, &id, serde_json::json!({}));
-    Json(ApiResponse::success(serde_json::json!({"started": true})))
+    let container_id = hyperbox_core::types::ContainerId::from(id.clone());
+
+    state.emit(EventType::ContainerStart, &id, serde_json::json!({"status": "starting"}));
+
+    match state.runtime.start(&container_id).await {
+        Ok(()) => {
+            // Update container status in daemon state
+            if let Some(mut container) = state.containers.get_mut(&id) {
+                container.status = crate::state::ContainerStatus::Running;
+                container.started_at = Some(chrono::Utc::now());
+            }
+
+            state.emit(EventType::ContainerStart, &id, serde_json::json!({"status": "running"}));
+            Json(ApiResponse::success(serde_json::json!({
+                "id": id,
+                "status": "started"
+            })))
+        }
+        Err(e) => {
+            state.emit(
+                EventType::ContainerStart,
+                &id,
+                serde_json::json!({"status": "error", "error": e.to_string()}),
+            );
+            Json(ApiResponse {
+                success: false,
+                data: Some(
+                    serde_json::json!({"error": format!("Failed to start container: {}", e)}),
+                ),
+                error: Some(format!("Failed to start container: {}", e)),
+            })
+        }
+    }
 }
 
 async fn stop_container(
     State(state): State<DaemonState>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    state.emit(EventType::ContainerStop, &id, serde_json::json!({}));
-    Json(ApiResponse::success(serde_json::json!({"stopped": true})))
+    let container_id = hyperbox_core::types::ContainerId::from(id.clone());
+    let timeout = std::time::Duration::from_secs(10);
+
+    state.emit(EventType::ContainerStop, &id, serde_json::json!({"status": "stopping"}));
+
+    match state.runtime.stop(&container_id, timeout).await {
+        Ok(()) => {
+            // Update container status in daemon state
+            if let Some(mut container) = state.containers.get_mut(&id) {
+                container.status = crate::state::ContainerStatus::Stopped;
+            }
+
+            state.emit(EventType::ContainerStop, &id, serde_json::json!({"status": "stopped"}));
+            Json(ApiResponse::success(serde_json::json!({
+                "id": id,
+                "status": "stopped"
+            })))
+        }
+        Err(e) => {
+            state.emit(
+                EventType::ContainerStop,
+                &id,
+                serde_json::json!({"status": "error", "error": e.to_string()}),
+            );
+            Json(ApiResponse {
+                success: false,
+                data: Some(
+                    serde_json::json!({"error": format!("Failed to stop container: {}", e)}),
+                ),
+                error: Some(format!("Failed to stop container: {}", e)),
+            })
+        }
+    }
 }
 
 async fn restart_container(
     State(state): State<DaemonState>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    Json(ApiResponse::success(serde_json::json!({"restarted": true})))
+    let container_id = hyperbox_core::types::ContainerId::from(id.clone());
+    let timeout = std::time::Duration::from_secs(10);
+
+    // Stop container
+    if let Err(e) = state.runtime.stop(&container_id, timeout).await {
+        return Json(ApiResponse {
+            success: false,
+            data: Some(
+                serde_json::json!({"error": format!("Failed to stop container for restart: {}", e)}),
+            ),
+            error: Some(format!("Failed to stop container for restart: {}", e)),
+        });
+    }
+
+    // Start container
+    match state.runtime.start(&container_id).await {
+        Ok(()) => {
+            // Update container status in daemon state
+            if let Some(mut container) = state.containers.get_mut(&id) {
+                container.status = crate::state::ContainerStatus::Running;
+                container.started_at = Some(chrono::Utc::now());
+            }
+
+            Json(ApiResponse::success(serde_json::json!({
+                "id": id,
+                "status": "restarted"
+            })))
+        }
+        Err(e) => Json(ApiResponse {
+            success: false,
+            data: Some(
+                serde_json::json!({"error": format!("Failed to start container after restart: {}", e)}),
+            ),
+            error: Some(format!("Failed to start container after restart: {}", e)),
+        }),
+    }
 }
 
 async fn remove_container(
     State(state): State<DaemonState>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    state.emit(EventType::ContainerRemove, &id, serde_json::json!({}));
-    Json(ApiResponse::success(serde_json::json!({"removed": true})))
+    let container_id = hyperbox_core::types::ContainerId::from(id.clone());
+
+    state.emit(EventType::ContainerRemove, &id, serde_json::json!({"status": "removing"}));
+
+    match state.runtime.remove(&container_id).await {
+        Ok(()) => {
+            // Remove from daemon state
+            state.containers.remove(&id);
+
+            state.emit(EventType::ContainerRemove, &id, serde_json::json!({"status": "removed"}));
+            Json(ApiResponse::success(serde_json::json!({
+                "id": id,
+                "status": "removed"
+            })))
+        }
+        Err(e) => {
+            state.emit(
+                EventType::ContainerRemove,
+                &id,
+                serde_json::json!({"status": "error", "error": e.to_string()}),
+            );
+            Json(ApiResponse {
+                success: false,
+                data: Some(
+                    serde_json::json!({"error": format!("Failed to remove container: {}", e)}),
+                ),
+                error: Some(format!("Failed to remove container: {}", e)),
+            })
+        }
+    }
 }
 
 async fn checkpoint_container(
@@ -324,8 +531,123 @@ async fn restore_container(
     Json(ApiResponse::success(serde_json::json!({"restored": true})))
 }
 
-async fn container_logs(Path(id): Path<String>) -> impl IntoResponse {
-    Json(ApiResponse::success(vec!["Container started", "Listening on port 3000"]))
+/// Query parameters for container logs
+#[derive(Debug, Deserialize)]
+struct LogsQuery {
+    #[serde(default)]
+    follow: bool,
+    #[serde(default)]
+    tail: Option<usize>,
+    #[serde(default)]
+    timestamps: bool,
+    #[serde(default)]
+    stdout: Option<bool>,
+    #[serde(default)]
+    stderr: Option<bool>,
+}
+
+async fn container_logs(
+    State(state): State<DaemonState>,
+    Path(id): Path<String>,
+    Query(query): Query<LogsQuery>,
+) -> impl IntoResponse {
+    use hyperbox_core::types::LogOptions;
+    use tokio::io::AsyncReadExt;
+
+    let container_id = hyperbox_core::types::ContainerId::from_string(&id);
+
+    let log_opts = LogOptions {
+        follow: false, // Don't follow for REST API (would need SSE/WebSocket)
+        tail: query.tail,
+        timestamps: query.timestamps,
+        stdout: query.stdout.unwrap_or(true),
+        stderr: query.stderr.unwrap_or(true),
+        since: None,
+        until: None,
+    };
+
+    match state.runtime.logs(&container_id, log_opts).await {
+        Ok(reader) => {
+            let mut buffer = Vec::new();
+            // Read up to 1MB of logs
+            let mut limited_reader = reader.take(1024 * 1024);
+
+            match limited_reader.read_to_end(&mut buffer).await {
+                Ok(_) => {
+                    // Parse logs into lines
+                    let log_text = String::from_utf8_lossy(&buffer);
+                    let lines: Vec<String> = log_text.lines().map(|s| s.to_string()).collect();
+
+                    Json(ApiResponse::success(lines))
+                }
+                Err(e) => Json(ApiResponse::<Vec<String>> {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Failed to read logs: {}", e)),
+                }),
+            }
+        }
+        Err(e) => {
+            // If container doesn't exist in runtime, check our state
+            if state.containers.contains_key(&id) {
+                // Container exists but might not have logs yet
+                Json(ApiResponse::success(vec![format!("[hyperbox] Container {} created", id)]))
+            } else {
+                Json(ApiResponse::<Vec<String>> {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Container not found: {}", e)),
+                })
+            }
+        }
+    }
+}
+
+/// Stream container logs via Server-Sent Events.
+///
+/// This endpoint provides real-time log streaming using SSE.
+/// Each log line is sent as a separate SSE event with event type "log".
+/// Connection errors are sent as "error" events.
+async fn container_logs_stream(
+    State(state): State<DaemonState>,
+    Path(id): Path<String>,
+    Query(query): Query<LogsQuery>,
+) -> Sse<impl futures::Stream<Item = Result<Event, Infallible>>> {
+    use hyperbox_core::types::LogOptions;
+
+    let container_id = hyperbox_core::types::ContainerId::from_string(&id);
+
+    let log_opts = LogOptions {
+        follow: true, // Always follow for streaming
+        tail: query.tail,
+        timestamps: query.timestamps,
+        stdout: query.stdout.unwrap_or(true),
+        stderr: query.stderr.unwrap_or(true),
+        since: None,
+        until: None,
+    };
+
+    // Create the SSE stream
+    let stream = async_stream::stream! {
+        match state.runtime.logs(&container_id, log_opts).await {
+            Ok(reader) => {
+                let buf_reader = tokio::io::BufReader::new(reader);
+                let mut lines = buf_reader.lines();
+
+                while let Ok(Some(line)) = lines.next_line().await {
+                    yield Ok(Event::default().event("log").data(line));
+                }
+
+                // Signal end of stream
+                yield Ok(Event::default().event("end").data("Stream ended"));
+            }
+            Err(e) => {
+                yield Ok(Event::default().event("error").data(format!("Failed to get logs: {}", e)));
+            }
+        }
+    };
+
+    Sse::new(stream).keep_alive(KeepAlive::default().interval(Duration::from_secs(15)))
 }
 
 async fn container_stats(
@@ -346,19 +668,77 @@ async fn container_stats(
 // === Image Handlers ===
 
 async fn list_images(State(state): State<DaemonState>) -> impl IntoResponse {
-    let images: Vec<_> = state.images.iter().map(|i| i.clone()).collect();
-    Json(ApiResponse::success(images))
+    // Get images from the container runtime
+    match state.runtime.list_images().await {
+        Ok(images) => {
+            // Convert to the API response format
+            let image_list: Vec<_> = images
+                .into_iter()
+                .map(|img| ImageState {
+                    id: img.id,
+                    tags: img.tags,
+                    size: img.size,
+                    created_at: img.created,
+                    is_estargz: false,
+                    layers: vec![],
+                })
+                .collect();
+            Json(ApiResponse::success(image_list))
+        }
+        Err(e) => {
+            // Fallback to cached images if runtime fails
+            let images: Vec<_> = state.images.iter().map(|i| i.clone()).collect();
+            Json(ApiResponse::success(images))
+        }
+    }
 }
 
 async fn pull_image(
     State(state): State<DaemonState>,
     Json(req): Json<PullImageRequest>,
 ) -> impl IntoResponse {
-    state.emit(EventType::ImagePull, &req.image, serde_json::json!({"platform": req.platform}));
-    Json(ApiResponse::success(serde_json::json!({
-        "image": req.image,
-        "status": "pulled"
-    })))
+    // Parse image reference
+    let image_ref = hyperbox_core::types::ImageRef::parse(&req.image);
+
+    // Emit start event
+    state.emit(
+        EventType::ImagePull,
+        &req.image,
+        serde_json::json!({"platform": req.platform, "status": "pulling"}),
+    );
+
+    // Actually pull the image via the runtime
+    match state.runtime.pull_image(&image_ref).await {
+        Ok(()) => {
+            // Update metrics
+            {
+                let mut metrics = state.metrics.write();
+                metrics.images_pulled += 1;
+            }
+
+            // Emit success event
+            state.emit(EventType::ImagePull, &req.image, serde_json::json!({"status": "complete"}));
+
+            Json(ApiResponse::success(serde_json::json!({
+                "image": req.image,
+                "status": "pulled"
+            })))
+        }
+        Err(e) => {
+            // Emit error event
+            state.emit(
+                EventType::ImagePull,
+                &req.image,
+                serde_json::json!({"status": "error", "error": e.to_string()}),
+            );
+
+            Json(ApiResponse {
+                success: false,
+                data: Some(serde_json::json!({"error": format!("Failed to pull image: {}", e)})),
+                error: Some(format!("Failed to pull image: {}", e)),
+            })
+        }
+    }
 }
 
 async fn get_image(State(state): State<DaemonState>, Path(id): Path<String>) -> impl IntoResponse {

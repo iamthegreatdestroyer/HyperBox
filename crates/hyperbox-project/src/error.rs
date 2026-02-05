@@ -65,10 +65,34 @@ pub enum ProjectError {
     #[error("File watcher error: {0}")]
     Watcher(String),
 
+    /// YAML parsing error.
+    #[error("YAML parse error: {0}")]
+    YamlParse(#[from] serde_yaml::Error),
+
+    /// Configuration file error.
+    #[error("Config error in {path}: {message}")]
+    ConfigError { path: PathBuf, message: String },
+
     /// Project state error.
     #[error("Invalid state transition: {from:?} -> {to:?}")]
     InvalidStateTransition {
         from: super::ProjectState,
         to: super::ProjectState,
     },
+
+    /// Container not found in project.
+    #[error("Container not found: {0}")]
+    ContainerNotFound(String),
+
+    /// Failed to create container.
+    #[error("Failed to create container '{container}': {reason}")]
+    ContainerCreate { container: String, reason: String },
+
+    /// Failed to start container.
+    #[error("Failed to start container '{container}': {reason}")]
+    ContainerStart { container: String, reason: String },
+
+    /// Cyclic dependency detected in container definitions.
+    #[error("Cyclic dependency detected in container depends_on")]
+    CyclicDependency,
 }

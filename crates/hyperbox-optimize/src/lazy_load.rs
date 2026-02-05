@@ -6,13 +6,12 @@
 use crate::error::{OptimizeError, Result};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// eStargz TOC entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -395,5 +394,221 @@ impl LazyLayerLoader {
             self.stats.bytes_downloaded.load(Ordering::Relaxed),
             self.stats.bytes_cached.load(Ordering::Relaxed),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_toc_entry_serialization() {
+        let entry = TocEntry {
+            name: "/bin/sh".to_string(),
+            file_type: "reg".to_string(),
+            size: 1024,
+            offset: 0,
+            chunk_offset: 0,
+            chunk_size: 512,
+            mode: 0o755,
+            uid: 0,
+            gid: 0,
+            digest: Some("sha256:abc123".to_string()),
+        };
+
+        let json = serde_json::to_string(&entry).unwrap();
+        let deserialized: TocEntry = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(entry.name, deserialized.name);
+        assert_eq!(entry.size, deserialized.size);
+        assert_eq!(entry.file_type, deserialized.file_type);
+    }
+
+    #[test]
+    fn test_toc_serialization() {
+        let toc = Toc {
+            version: 1,
+            entries: vec![TocEntry {
+                name: "/bin/sh".to_string(),
+                file_type: "reg".to_string(),
+                size: 1024,
+                offset: 0,
+                chunk_offset: 0,
+                chunk_size: 512,
+                mode: 0o755,
+                uid: 0,
+                gid: 0,
+                digest: None,
+            }],
+        };
+
+        let json = serde_json::to_string(&toc).unwrap();
+        let deserialized: Toc = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(toc.version, deserialized.version);
+        assert_eq!(toc.entries.len(), deserialized.entries.len());
+    }
+
+    #[tokio::test]
+    async fn test_lazy_layer_loader_creation() {
+        let dir = tempdir().unwrap();
+        let loader = LazyLayerLoader::new(dir.path(), "https://registry.example.com");
+
+        assert_eq!(loader.cache_hit_rate(), 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_lazy_layer_loader_initialize() {
+        let dir = tempdir().unwrap();
+        let loader = LazyLayerLoader::new(dir.path(), "https://registry.example.com");
+
+        let result = loader.initialize().await;
+        assert!(result.is_ok());
+        assert!(dir.path().exists());
+    }
+
+    #[tokio::test]
+    async fn test_stats_initial_values() {
+        let dir = tempdir().unwrap();
+        let loader = LazyLayerLoader::new(dir.path(), "https://registry.example.com");
+
+        let (hits, misses, downloaded, cached) = loader.stats();
+        assert_eq!(hits, 0);
+        assert_eq!(misses, 0);
+        assert_eq!(downloaded, 0);
+        assert_eq!(cached, 0);
+    }
+
+    #[tokio::test]
+    async fn test_layer_not_found() {
+        let dir = tempdir().unwrap();
+        let loader = LazyLayerLoader::new(dir.path(), "https://registry.example.com");
+
+        let result = loader.read_file("sha256:nonexistent", "/bin/sh").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            OptimizeError::LayerNotFound { .. } => (),
+            _ => panic!("Expected LayerNotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_progress_layer_not_found() {
+        let dir = tempdir().unwrap();
+        let loader = LazyLayerLoader::new(dir.path(), "https://registry.example.com");
+
+        let result = loader.get_progress("sha256:nonexistent").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_prefetch_list_layer_not_found() {
+        let dir = tempdir().unwrap();
+        let loader = LazyLayerLoader::new(dir.path(), "https://registry.example.com");
+
+        let result = loader.get_prefetch_list("sha256:nonexistent").await;
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_toc_empty() {
+        let dir = tempdir().unwrap();
+        let loader = LazyLayerLoader::new(dir.path(), "https://registry.example.com");
+
+        let data = b"no toc marker here";
+        let result = loader.parse_toc(data);
+        assert!(result.is_ok());
+
+        let toc = result.unwrap();
+        assert!(toc.entries.is_empty());
+    }
+
+    #[test]
+    fn test_parse_toc_with_valid_json() {
+        let dir = tempdir().unwrap();
+        let loader = LazyLayerLoader::new(dir.path(), "https://registry.example.com");
+
+        let toc_json = r#"stargz.index.json{"version":1,"entries":[{"name":"/test","type":"reg","size":100,"offset":0,"chunk_offset":0,"chunk_size":50,"mode":420,"uid":0,"gid":0}]}"#;
+        let result = loader.parse_toc(toc_json.as_bytes());
+        assert!(result.is_ok());
+
+        let toc = result.unwrap();
+        assert_eq!(toc.version, 1);
+        assert_eq!(toc.entries.len(), 1);
+        assert_eq!(toc.entries[0].name, "/test");
+    }
+
+    #[test]
+    fn test_cache_hit_rate_zero_when_no_accesses() {
+        let dir = tempdir().unwrap();
+        let loader = LazyLayerLoader::new(dir.path(), "https://registry.example.com");
+
+        assert_eq!(loader.cache_hit_rate(), 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_layer_state_creation() {
+        let toc = Toc {
+            version: 1,
+            entries: vec![
+                TocEntry {
+                    name: "/file1".to_string(),
+                    file_type: "reg".to_string(),
+                    size: 100,
+                    offset: 0,
+                    chunk_offset: 0,
+                    chunk_size: 100,
+                    mode: 0o644,
+                    uid: 0,
+                    gid: 0,
+                    digest: None,
+                },
+                TocEntry {
+                    name: "/file2".to_string(),
+                    file_type: "reg".to_string(),
+                    size: 200,
+                    offset: 100,
+                    chunk_offset: 100,
+                    chunk_size: 200,
+                    mode: 0o644,
+                    uid: 0,
+                    gid: 0,
+                    digest: None,
+                },
+            ],
+        };
+
+        let total_size: u64 = toc.entries.iter().map(|e| e.size).sum();
+        assert_eq!(total_size, 300);
+    }
+
+    #[test]
+    fn test_toc_entry_types() {
+        let regular = TocEntry {
+            name: "/file".to_string(),
+            file_type: "reg".to_string(),
+            size: 0,
+            offset: 0,
+            chunk_offset: 0,
+            chunk_size: 0,
+            mode: 0o644,
+            uid: 0,
+            gid: 0,
+            digest: None,
+        };
+        assert_eq!(regular.file_type, "reg");
+
+        let dir = TocEntry {
+            file_type: "dir".to_string(),
+            ..regular.clone()
+        };
+        assert_eq!(dir.file_type, "dir");
+
+        let symlink = TocEntry {
+            file_type: "symlink".to_string(),
+            ..regular.clone()
+        };
+        assert_eq!(symlink.file_type, "symlink");
     }
 }

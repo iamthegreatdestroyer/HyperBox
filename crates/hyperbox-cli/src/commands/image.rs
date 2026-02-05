@@ -7,6 +7,8 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
 use tabled::{Table, Tabled};
 
+use crate::client::DaemonClient;
+
 /// Image management commands.
 #[derive(Args)]
 pub struct ImageCommand {
@@ -134,11 +136,21 @@ pub enum ImageAction {
 pub async fn run(cmd: ImageCommand) -> Result<()> {
     match cmd.action {
         ImageAction::List { all, quiet } => list_images(all, quiet).await,
-        ImageAction::Pull { image, all_tags, platform } => pull_image(image, all_tags, platform).await,
+        ImageAction::Pull {
+            image,
+            all_tags,
+            platform,
+        } => pull_image(image, all_tags, platform).await,
         ImageAction::Push { image, all_tags } => push_image(image, all_tags).await,
-        ImageAction::Build { path, tag, file, build_arg, target, no_cache, pull } => {
-            build_image(path, tag, file, build_arg, target, no_cache, pull).await
-        }
+        ImageAction::Build {
+            path,
+            tag,
+            file,
+            build_arg,
+            target,
+            no_cache,
+            pull,
+        } => build_image(path, tag, file, build_arg, target, no_cache, pull).await,
         ImageAction::Remove { images, force } => remove_images(images, force).await,
         ImageAction::Inspect { image } => inspect_image(image).await,
         ImageAction::History { image, no_trunc } => show_history(image, no_trunc).await,
@@ -160,33 +172,33 @@ struct ImageInfo {
 }
 
 async fn list_images(all: bool, quiet: bool) -> Result<()> {
-    let images = vec![
-        ImageInfo {
-            repository: "node".to_string(),
-            tag: "20".to_string(),
-            id: "abc123def456".to_string(),
-            size: "1.1GB".to_string(),
-        },
-        ImageInfo {
-            repository: "postgres".to_string(),
-            tag: "15".to_string(),
-            id: "789xyz012abc".to_string(),
-            size: "412MB".to_string(),
-        },
-        ImageInfo {
-            repository: "redis".to_string(),
-            tag: "7".to_string(),
-            id: "def456ghi789".to_string(),
-            size: "138MB".to_string(),
-        },
-    ];
+    let client = DaemonClient::new();
+
+    if !client.is_running().await {
+        eprintln!("{} Daemon is not running. Start it with: hyperboxd", "✗".red());
+        return Ok(());
+    }
+
+    let images = client.list_images().await?;
 
     if quiet {
         for img in &images {
-            println!("{}", img.id);
+            println!("{}", &img.id[..12.min(img.id.len())]);
         }
+    } else if images.is_empty() {
+        println!("{}", "No images found".dimmed());
     } else {
-        let table = Table::new(images).to_string();
+        let display: Vec<ImageInfo> = images
+            .iter()
+            .map(|img| ImageInfo {
+                repository: img.repo.clone().unwrap_or_else(|| "<none>".to_string()),
+                tag: img.tag.clone().unwrap_or_else(|| "<none>".to_string()),
+                id: img.id.chars().take(12).collect(),
+                size: humansize::format_size(img.size, humansize::BINARY),
+            })
+            .collect();
+
+        let table = Table::new(display).to_string();
         println!("{}", table);
     }
 
@@ -194,35 +206,34 @@ async fn list_images(all: bool, quiet: bool) -> Result<()> {
 }
 
 async fn pull_image(image: String, all_tags: bool, platform: Option<String>) -> Result<()> {
-    println!("{} Pulling {}...", "→".blue(), image.cyan());
+    let client = DaemonClient::new();
 
-    let pb = ProgressBar::new(100);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>3}/{len:3} {msg}")
-            .unwrap()
-            .progress_chars("█▓▒░")
-    );
-
-    // Simulate layer downloads
-    for i in 0..=100 {
-        pb.set_position(i);
-        if i < 30 {
-            pb.set_message("Pulling layer 1/3...");
-        } else if i < 60 {
-            pb.set_message("Pulling layer 2/3...");
-        } else {
-            pb.set_message("Pulling layer 3/3...");
-        }
-        tokio::time::sleep(Duration::from_millis(20)).await;
+    if !client.is_running().await {
+        eprintln!("{} Daemon is not running. Start it with: hyperboxd", "✗".red());
+        return Ok(());
     }
 
-    pb.finish_with_message("Done");
+    println!("{} Pulling {}...", "→".blue(), image.cyan());
 
-    println!();
-    println!("{} Pulled {} (using {} lazy loading)", "✓".green(), image.cyan(), "eStargz".yellow());
-    println!("  {} Startup-critical files: pre-fetched", "→".blue());
-    println!("  {} Remaining layers: will load on-demand", "→".blue());
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap(),
+    );
+    pb.set_message("Pulling image layers...");
+    pb.enable_steady_tick(Duration::from_millis(80));
+
+    match client.pull_image(&image).await {
+        Ok(_) => {
+            pb.finish_and_clear();
+            println!("{} Pulled {} successfully", "✓".green(), image.cyan());
+        }
+        Err(e) => {
+            pb.finish_and_clear();
+            eprintln!("{} Failed to pull {}: {}", "✗".red(), image, e);
+        }
+    }
 
     Ok(())
 }
@@ -235,7 +246,7 @@ async fn push_image(image: String, all_tags: bool) -> Result<()> {
         ProgressStyle::default_bar()
             .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>3}/{len:3}")
             .unwrap()
-            .progress_chars("█▓▒░")
+            .progress_chars("█▓▒░"),
     );
 
     for i in 0..=100 {
@@ -259,7 +270,10 @@ async fn build_image(
     no_cache: bool,
     pull: bool,
 ) -> Result<()> {
-    let tag = tags.first().cloned().unwrap_or_else(|| "latest".to_string());
+    let tag = tags
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "latest".to_string());
 
     println!("{} Building image {}...", "→".blue(), tag.cyan());
     println!("  {} Context: {}", "→".blue(), path);
@@ -291,33 +305,58 @@ async fn build_image(
 }
 
 async fn remove_images(images: Vec<String>, force: bool) -> Result<()> {
-    for image in &images {
-        println!("{} Removing image {}...", "→".blue(), image.cyan());
+    let client = DaemonClient::new();
+
+    if !client.is_running().await {
+        eprintln!("{} Daemon is not running. Start it with: hyperboxd", "✗".red());
+        return Ok(());
     }
-    println!("{} Removed {} image(s)", "✓".green(), images.len());
+
+    let mut removed = 0;
+    for image in &images {
+        print!("{} Removing image {}...", "→".blue(), image.cyan());
+        match client.remove_image(image, force).await {
+            Ok(_) => {
+                println!(" {}", "✓".green());
+                removed += 1;
+            }
+            Err(e) => {
+                println!(" {}", "✗".red());
+                eprintln!("  Error: {}", e);
+            }
+        }
+    }
+
+    if removed > 0 {
+        println!("{} Removed {} image(s)", "✓".green(), removed);
+    }
     Ok(())
 }
 
 async fn inspect_image(image: String) -> Result<()> {
-    println!("{}", serde_json::json!({
-        "Id": "sha256:abc123def456...",
-        "RepoTags": ["node:20"],
-        "Created": "2024-01-01T00:00:00Z",
-        "Size": 1100000000,
-        "Config": {
-            "Env": ["NODE_VERSION=20.0.0"],
-            "Cmd": ["node"],
-            "WorkingDir": "/app"
-        },
-        "RootFS": {
-            "Type": "layers",
-            "Layers": [
-                "sha256:layer1...",
-                "sha256:layer2...",
-                "sha256:layer3..."
-            ]
-        }
-    }).to_string());
+    println!(
+        "{}",
+        serde_json::json!({
+            "Id": "sha256:abc123def456...",
+            "RepoTags": ["node:20"],
+            "Created": "2024-01-01T00:00:00Z",
+            "Size": 1100000000,
+            "Config": {
+                "Env": ["NODE_VERSION=20.0.0"],
+                "Cmd": ["node"],
+                "WorkingDir": "/app"
+            },
+            "RootFS": {
+                "Type": "layers",
+                "Layers": [
+                    "sha256:layer1...",
+                    "sha256:layer2...",
+                    "sha256:layer3..."
+                ]
+            }
+        })
+        .to_string()
+    );
 
     Ok(())
 }
@@ -369,7 +408,10 @@ async fn tag_image(source: String, target: String) -> Result<()> {
 
 async fn prune_images(all: bool, force: bool) -> Result<()> {
     if !force {
-        println!("WARNING! This will remove all {} images.", if all { "unused" } else { "dangling" });
+        println!(
+            "WARNING! This will remove all {} images.",
+            if all { "unused" } else { "dangling" }
+        );
         // Would prompt for confirmation here
     }
 

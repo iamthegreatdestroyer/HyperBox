@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo bench -p hyperbox-optimize
 
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::time::Duration;
 
 /// Benchmark CRIU checkpoint preparation (mocked)
@@ -44,12 +44,12 @@ fn bench_lazy_layer_lookup(c: &mut Criterion) {
 
 /// Benchmark prediction model update
 fn bench_prediction_update(c: &mut Criterion) {
-    let mut access_counts: Vec<(String, u64)> = (0..1000)
-        .map(|i| (format!("container_{}", i), i as u64))
-        .collect();
-
     c.bench_function("prediction_update", |b| {
         b.iter(|| {
+            let mut access_counts: Vec<(String, u64)> = (0..1000)
+                .map(|i| (format!("container_{}", i), i as u64))
+                .collect();
+
             // Simulate updating prediction weights
             for (_, count) in access_counts.iter_mut() {
                 *count = (*count as f64 * 0.95 + 1.0) as u64;
@@ -57,7 +57,8 @@ fn bench_prediction_update(c: &mut Criterion) {
 
             // Sort by access count for prediction
             access_counts.sort_by(|a, b| b.1.cmp(&a.1));
-            black_box(&access_counts[0..10])
+            let top_10: Vec<_> = access_counts.into_iter().take(10).collect();
+            black_box(top_10)
         });
     });
 }
@@ -76,7 +77,8 @@ fn bench_prewarm_selection(c: &mut Criterion) {
                 // Select top 10 candidates
                 let mut sorted = candidates.clone();
                 sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-                black_box(&sorted[0..10.min(sorted.len())])
+                let top_10: Vec<_> = sorted.into_iter().take(10).collect();
+                black_box(top_10)
             });
         });
     }
@@ -123,7 +125,7 @@ fn bench_dedup_lookup(c: &mut Criterion) {
     use std::collections::HashSet;
 
     // Simulate a dedup index
-    let dedup_index: HashSet<[u8; 32]> = (0..100_000)
+    let dedup_index: HashSet<[u8; 32]> = (0u64..100_000)
         .map(|i| {
             let mut hash = [0u8; 32];
             hash[0..8].copy_from_slice(&i.to_le_bytes());

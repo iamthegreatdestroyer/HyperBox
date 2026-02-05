@@ -4,6 +4,7 @@ use crate::config::DaemonConfig;
 use crate::error::{DaemonError, Result};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
+use hyperbox_core::runtime::{ContainerRuntime, DockerRuntime};
 use hyperbox_optimize::criu::CriuManager;
 use hyperbox_optimize::lazy_load::LazyLayerLoader;
 use hyperbox_optimize::predict::UsagePredictor;
@@ -20,6 +21,9 @@ use uuid::Uuid;
 pub struct DaemonState {
     /// Configuration
     pub config: DaemonConfig,
+
+    /// Container runtime (Docker, crun, etc.)
+    pub runtime: Arc<dyn ContainerRuntime>,
 
     /// Active containers
     pub containers: Arc<DashMap<String, ContainerState>>,
@@ -228,6 +232,12 @@ impl DaemonState {
         // Create event channel
         let (events, _) = broadcast::channel(1024);
 
+        // Initialize container runtime (Docker by default)
+        let runtime: Arc<dyn ContainerRuntime> = Arc::new(
+            DockerRuntime::new()
+                .map_err(|e| DaemonError::Internal(format!("Failed to initialize Docker runtime: {}", e)))?
+        );
+
         // Initialize CRIU manager (not async)
         let criu = CriuManager::new(config.optimization.checkpoints_dir.clone());
 
@@ -256,6 +266,7 @@ impl DaemonState {
 
         Ok(Self {
             config: config.clone(),
+            runtime,
             containers: Arc::new(DashMap::new()),
             projects: Arc::new(ProjectManager::new(config.data_dir.join("projects"))),
             images: Arc::new(DashMap::new()),

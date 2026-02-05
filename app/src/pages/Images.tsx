@@ -81,7 +81,7 @@ export default function Images() {
   };
 
   const filteredImages = images.filter((img) =>
-    img.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase())),
+    (img.tags || []).some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase())),
   );
 
   return (

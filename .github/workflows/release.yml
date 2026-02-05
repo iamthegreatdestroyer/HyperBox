@@ -1,198 +1,198 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+    push:
+        tags:
+            - "v*"
 
 env:
-  CARGO_TERM_COLOR: always
+    CARGO_TERM_COLOR: always
 
 permissions:
-  contents: write
+    contents: write
 
 jobs:
-  # ============================================
-  # Create GitHub Release
-  # ============================================
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      release_id: ${{ steps.create_release.outputs.id }}
-    steps:
-      - uses: actions/checkout@v4
+    # ============================================
+    # Create GitHub Release
+    # ============================================
+    create-release:
+        name: Create Release
+        runs-on: ubuntu-latest
+        outputs:
+            upload_url: ${{ steps.create_release.outputs.upload_url }}
+            release_id: ${{ steps.create_release.outputs.id }}
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            - name: Get version from tag
+              id: get_version
+              run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          name: HyperBox v${{ steps.get_version.outputs.VERSION }}
-          draft: true
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Create Release
+              id: create_release
+              uses: softprops/action-gh-release@v1
+              with:
+                  name: HyperBox v${{ steps.get_version.outputs.VERSION }}
+                  draft: true
+                  prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+                  generate_release_notes: true
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ============================================
-  # Build CLI & Daemon Binaries
-  # ============================================
-  build-binaries:
-    name: Build Binaries (${{ matrix.target }})
-    needs: create-release
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            archive: tar.gz
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            archive: tar.gz
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            archive: zip
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            archive: tar.gz
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            archive: tar.gz
-    steps:
-      - uses: actions/checkout@v4
+    # ============================================
+    # Build CLI & Daemon Binaries
+    # ============================================
+    build-binaries:
+        name: Build Binaries (${{ matrix.target }})
+        needs: create-release
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      target: x86_64-unknown-linux-gnu
+                      archive: tar.gz
+                    - os: ubuntu-latest
+                      target: aarch64-unknown-linux-gnu
+                      archive: tar.gz
+                    - os: windows-latest
+                      target: x86_64-pc-windows-msvc
+                      archive: zip
+                    - os: macos-latest
+                      target: x86_64-apple-darwin
+                      archive: tar.gz
+                    - os: macos-latest
+                      target: aarch64-apple-darwin
+                      archive: tar.gz
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
-        with:
-          targets: ${{ matrix.target }}
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-action@stable
+              with:
+                  targets: ${{ matrix.target }}
 
-      - name: Install cross-compilation tools
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+            - name: Install cross-compilation tools
+              if: matrix.target == 'aarch64-unknown-linux-gnu'
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y gcc-aarch64-linux-gnu
 
-      - name: Build CLI
-        run: cargo build --release --package hyperbox-cli --target ${{ matrix.target }}
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+            - name: Build CLI
+              run: cargo build --release --package hyperbox-cli --target ${{ matrix.target }}
+              env:
+                  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
-      - name: Build Daemon
-        run: cargo build --release --package hyperbox-daemon --target ${{ matrix.target }}
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+            - name: Build Daemon
+              run: cargo build --release --package hyperbox-daemon --target ${{ matrix.target }}
+              env:
+                  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
-      - name: Package (Unix)
-        if: matrix.archive == 'tar.gz'
-        run: |
-          mkdir -p dist
-          cp target/${{ matrix.target }}/release/hb dist/ || cp target/${{ matrix.target }}/release/hb.exe dist/
-          cp target/${{ matrix.target }}/release/hyperboxd dist/ || cp target/${{ matrix.target }}/release/hyperboxd.exe dist/
-          cd dist
-          tar -czvf ../hyperbox-${{ matrix.target }}.tar.gz *
+            - name: Package (Unix)
+              if: matrix.archive == 'tar.gz'
+              run: |
+                  mkdir -p dist
+                  cp target/${{ matrix.target }}/release/hb dist/ || cp target/${{ matrix.target }}/release/hb.exe dist/
+                  cp target/${{ matrix.target }}/release/hyperboxd dist/ || cp target/${{ matrix.target }}/release/hyperboxd.exe dist/
+                  cd dist
+                  tar -czvf ../hyperbox-${{ matrix.target }}.tar.gz *
 
-      - name: Package (Windows)
-        if: matrix.archive == 'zip'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist
-          Copy-Item "target/${{ matrix.target }}/release/hb.exe" -Destination dist/
-          Copy-Item "target/${{ matrix.target }}/release/hyperboxd.exe" -Destination dist/
-          Compress-Archive -Path dist/* -DestinationPath hyperbox-${{ matrix.target }}.zip
+            - name: Package (Windows)
+              if: matrix.archive == 'zip'
+              shell: pwsh
+              run: |
+                  New-Item -ItemType Directory -Force -Path dist
+                  Copy-Item "target/${{ matrix.target }}/release/hb.exe" -Destination dist/
+                  Copy-Item "target/${{ matrix.target }}/release/hyperboxd.exe" -Destination dist/
+                  Compress-Archive -Path dist/* -DestinationPath hyperbox-${{ matrix.target }}.zip
 
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            hyperbox-${{ matrix.target }}.${{ matrix.archive }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Upload Release Asset
+              uses: softprops/action-gh-release@v1
+              with:
+                  files: |
+                      hyperbox-${{ matrix.target }}.${{ matrix.archive }}
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ============================================
-  # Build Tauri Desktop App
-  # ============================================
-  build-tauri:
-    name: Build Desktop (${{ matrix.os }})
-    needs: create-release
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-          - os: macos-latest
-            target: x86_64-apple-darwin
-          - os: macos-latest
-            target: aarch64-apple-darwin
-    steps:
-      - uses: actions/checkout@v4
+    # ============================================
+    # Build Tauri Desktop App
+    # ============================================
+    build-tauri:
+        name: Build Desktop (${{ matrix.os }})
+        needs: create-release
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-latest
+                      target: x86_64-unknown-linux-gnu
+                    - os: windows-latest
+                      target: x86_64-pc-windows-msvc
+                    - os: macos-latest
+                      target: x86_64-apple-darwin
+                    - os: macos-latest
+                      target: aarch64-apple-darwin
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
-        with:
-          targets: ${{ matrix.target }}
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-action@stable
+              with:
+                  targets: ${{ matrix.target }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
+            - name: Install pnpm
+              uses: pnpm/action-setup@v2
+              with:
+                  version: 8
 
-      # Linux dependencies for Tauri
-      - name: Install Linux dependencies
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+            # Linux dependencies for Tauri
+            - name: Install Linux dependencies
+              if: matrix.os == 'ubuntu-latest'
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Install frontend dependencies
-        working-directory: app
-        run: pnpm install
+            - name: Install frontend dependencies
+              working-directory: app
+              run: pnpm install
 
-      - name: Build Tauri app
-        working-directory: app
-        run: pnpm tauri build --target ${{ matrix.target }}
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+            - name: Build Tauri app
+              working-directory: app
+              run: pnpm tauri build --target ${{ matrix.target }}
+              env:
+                  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+                  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Upload Release Assets
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
-            app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
-            app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
-            app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
-            app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Upload Release Assets
+              uses: softprops/action-gh-release@v1
+              with:
+                  files: |
+                      app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
+                      app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
+                      app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
+                      app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
+                      app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ============================================
-  # Publish Release
-  # ============================================
-  publish-release:
-    name: Publish Release
-    needs: [build-binaries, build-tauri]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish release
-        uses: softprops/action-gh-release@v1
-        with:
-          draft: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # ============================================
+    # Publish Release
+    # ============================================
+    publish-release:
+        name: Publish Release
+        needs: [build-binaries, build-tauri]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Publish release
+              uses: softprops/action-gh-release@v1
+              with:
+                  draft: false
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

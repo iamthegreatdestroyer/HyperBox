@@ -128,12 +128,12 @@ cargo test --all -- --nocapture
 
 ### Core Crates
 
-| Crate | Purpose |
-|-------|---------|
-| `hyperbox-core` | Core types, errors, container ID generation, runtime registry |
-| `hyperbox-cli` | Command-line interface with clap-based argument parsing |
-| `hyperbox-daemon` | Background service with IPC and container lifecycle management |
-| `hyperbox-project` | Project detection, configuration, and file watching |
+| Crate               | Purpose                                                            |
+| ------------------- | ------------------------------------------------------------------ |
+| `hyperbox-core`     | Core types, errors, container ID generation, runtime registry      |
+| `hyperbox-cli`      | Command-line interface with clap-based argument parsing            |
+| `hyperbox-daemon`   | Background service with IPC and container lifecycle management     |
+| `hyperbox-project`  | Project detection, configuration, and file watching                |
 | `hyperbox-optimize` | Prewarming predictions, lazy loading, and performance optimization |
 
 ### Design Principles
@@ -147,19 +147,19 @@ cargo test --all -- --nocapture
 
 HyperBox stores configuration in platform-specific locations:
 
-| Platform | Config Path |
-|----------|-------------|
-| Windows | `%APPDATA%\hyperbox\` |
-| macOS | `~/Library/Application Support/hyperbox/` |
-| Linux | `~/.config/hyperbox/` |
+| Platform | Config Path                               |
+| -------- | ----------------------------------------- |
+| Windows  | `%APPDATA%\hyperbox\`                     |
+| macOS    | `~/Library/Application Support/hyperbox/` |
+| Linux    | `~/.config/hyperbox/`                     |
 
 ## 📊 Performance
 
-| Metric | Docker Desktop | HyperBox | Improvement |
-|--------|---------------|----------|-------------|
-| Cold Start | ~10s | <500ms | **20x** |
-| Memory Idle | ~2GB | <100MB | **20x** |
-| Container Create | ~2s | <100ms | **20x** |
+| Metric           | Docker Desktop | HyperBox | Improvement |
+| ---------------- | -------------- | -------- | ----------- |
+| Cold Start       | ~10s           | <500ms   | **20x**     |
+| Memory Idle      | ~2GB           | <100MB   | **20x**     |
+| Container Create | ~2s            | <100ms   | **20x**     |
 
 ## 🤝 Contributing
 

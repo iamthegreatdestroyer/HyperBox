@@ -221,6 +221,48 @@ pub trait ContainerRuntime: Send + Sync {
     ///
     /// List of processes running in the container.
     async fn top(&self, id: &ContainerId) -> Result<Vec<ProcessInfo>>;
+
+    /// Pull an image from a registry.
+    ///
+    /// # Arguments
+    ///
+    /// * `image` - Image reference to pull
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) on successful pull.
+    async fn pull_image(&self, image: &crate::types::ImageRef) -> Result<()>;
+
+    /// Check if an image exists locally.
+    ///
+    /// # Arguments
+    ///
+    /// * `image` - Image reference to check
+    ///
+    /// # Returns
+    ///
+    /// True if the image exists locally.
+    async fn image_exists(&self, image: &str) -> Result<bool>;
+
+    /// List locally available images.
+    ///
+    /// # Returns
+    ///
+    /// List of image references.
+    async fn list_images(&self) -> Result<Vec<ImageInfo>>;
+}
+
+/// Image information.
+#[derive(Debug, Clone)]
+pub struct ImageInfo {
+    /// Image ID (digest)
+    pub id: String,
+    /// Image tags
+    pub tags: Vec<String>,
+    /// Size in bytes
+    pub size: u64,
+    /// Creation timestamp
+    pub created: chrono::DateTime<chrono::Utc>,
 }
 
 /// Process information.

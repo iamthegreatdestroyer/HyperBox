@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Box, Play, Square, RotateCcw, Trash2, Zap, Terminal } from "lucide-react";
+import { Box, Play, Square, RotateCcw, Trash2, Zap, Terminal, Plus } from "lucide-react";
 import { useContainerStore, Container } from "../stores/containers";
+import CreateContainerModal from "../components/CreateContainerModal";
 import { clsx } from "clsx";
 
 export default function Containers() {
@@ -15,6 +16,7 @@ export default function Containers() {
   } = useContainerStore();
   const [showAll, setShowAll] = useState(true);
   const [selectedContainer, setSelectedContainer] = useState<Container | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     fetchContainers(showAll);
@@ -62,6 +64,13 @@ export default function Containers() {
             />
             Show stopped
           </label>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-primary-600 hover:bg-primary-700 text-white transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Create Container
+          </button>
         </div>
       </div>
 
@@ -118,7 +127,9 @@ export default function Containers() {
                         {container.status}
                       </span>
                       {container.hasCheckpoint && (
-                        <Zap className="w-4 h-4 text-warning-500" title="CRIU Checkpoint" />
+                        <span title="CRIU Checkpoint">
+                          <Zap className="w-4 h-4 text-warning-500" />
+                        </span>
                       )}
                     </div>
                   </td>
@@ -227,6 +238,13 @@ export default function Containers() {
           </div>
         </div>
       )}
+
+      {/* Create Container Modal */}
+      <CreateContainerModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => fetchContainers(showAll)}
+      />
     </div>
   );
 }

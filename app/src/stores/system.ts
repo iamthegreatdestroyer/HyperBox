@@ -14,14 +14,26 @@ interface SystemInfo {
   daemonConnected: boolean;
 }
 
+export interface PerformanceMetrics {
+  coldStartAvgMs: number;
+  warmStartAvgMs: number;
+  speedupFactor: number;
+  lazyLoadHitRate: number;
+  prewarmHitRate: number;
+  checkpointsActive: number;
+  containersPrewarmed: number;
+}
+
 interface SystemState {
   daemonConnected: boolean;
   systemInfo: SystemInfo | null;
+  performanceMetrics: PerformanceMetrics | null;
   theme: "light" | "dark" | "system";
   loading: boolean;
   error: string | null;
   checkDaemonStatus: () => Promise<void>;
   fetchSystemInfo: () => Promise<void>;
+  fetchPerformanceMetrics: () => Promise<void>;
   startDaemon: () => Promise<void>;
   stopDaemon: () => Promise<void>;
   setTheme: (theme: "light" | "dark" | "system") => void;
@@ -30,6 +42,7 @@ interface SystemState {
 export const useSystemStore = create<SystemState>((set, get) => ({
   daemonConnected: false,
   systemInfo: null,
+  performanceMetrics: null,
   theme: "system",
   loading: false,
   error: null,
@@ -40,6 +53,7 @@ export const useSystemStore = create<SystemState>((set, get) => ({
       set({ daemonConnected: connected });
       if (connected) {
         get().fetchSystemInfo();
+        get().fetchPerformanceMetrics();
       }
     } catch (error) {
       set({ daemonConnected: false });
@@ -80,6 +94,35 @@ export const useSystemStore = create<SystemState>((set, get) => ({
       });
     } catch (error) {
       set({ error: String(error), loading: false });
+    }
+  },
+
+  fetchPerformanceMetrics: async () => {
+    try {
+      const metrics = await invoke<{
+        cold_start_avg_ms: number;
+        warm_start_avg_ms: number;
+        speedup_factor: number;
+        lazy_load_hit_rate: number;
+        prewarm_hit_rate: number;
+        checkpoints_active: number;
+        containers_prewarmed: number;
+      }>("get_performance_metrics");
+
+      set({
+        performanceMetrics: {
+          coldStartAvgMs: metrics.cold_start_avg_ms,
+          warmStartAvgMs: metrics.warm_start_avg_ms,
+          speedupFactor: metrics.speedup_factor,
+          lazyLoadHitRate: metrics.lazy_load_hit_rate,
+          prewarmHitRate: metrics.prewarm_hit_rate,
+          checkpointsActive: metrics.checkpoints_active,
+          containersPrewarmed: metrics.containers_prewarmed,
+        },
+      });
+    } catch (error) {
+      // Performance metrics are optional - don't set error
+      console.warn("Failed to fetch performance metrics:", error);
     }
   },
 

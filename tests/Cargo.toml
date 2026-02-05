@@ -1,0 +1,31 @@
+[package]
+name = "hyperbox-e2e-tests"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "End-to-end tests for HyperBox container platform"
+publish = false
+
+# This is a test-only crate
+[[test]]
+name = "e2e"
+path = "e2e/mod.rs"
+
+[[test]]
+name = "integration"
+path = "integration/image_pull.rs"
+
+[dependencies]
+# Core hyperbox dependencies for testing
+hyperbox-core = { path = "../crates/hyperbox-core" }
+tokio = { workspace = true, features = ["full"] }
+
+[dev-dependencies]
+# Testing utilities from workspace
+tempfile.workspace = true
+criterion.workspace = true
+
+# Additional test utilities
+serial_test = "3.0"
+rand = "0.8"

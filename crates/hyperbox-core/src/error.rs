@@ -107,6 +107,10 @@ pub enum CoreError {
     /// Internal error
     #[error("Internal error: {0}")]
     Internal(String),
+
+    /// Runtime error (generic runtime failures)
+    #[error("Runtime error: {0}")]
+    Runtime(String),
 }
 
 impl CoreError {

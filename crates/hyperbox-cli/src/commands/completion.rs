@@ -1,7 +1,7 @@
 //! Shell completion generation.
 
 use anyhow::Result;
-use clap::{Args, Command, CommandFactory, ValueEnum};
+use clap::{Args, Command, CommandFactory};
 use clap_complete::{generate, Generator, Shell};
 use std::io;
 

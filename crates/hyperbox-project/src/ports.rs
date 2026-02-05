@@ -7,7 +7,7 @@ use crate::error::{ProjectError, Result};
 use dashmap::{DashMap, DashSet};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicU16, Ordering};
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Minimum ephemeral port.
 const MIN_PORT: u16 = 32768;

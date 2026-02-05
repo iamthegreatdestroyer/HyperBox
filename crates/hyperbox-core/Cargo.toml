@@ -28,6 +28,8 @@ sha2.workspace = true
 hex.workspace = true
 num_cpus.workspace = true
 reqwest.workspace = true
+tar.workspace = true
+flate2.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 nix.workspace = true
@@ -45,6 +47,11 @@ windows = { version = "0.52", features = [
 mockall.workspace = true
 proptest.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
+criterion = "0.5"
+
+[[bench]]
+name = "runtime_benchmarks"
+harness = false
 
 [features]
 default = []

@@ -5,17 +5,16 @@
 
 use crate::error::{OptimizeError, Result};
 use crate::predict::UsagePredictor;
-use chrono::{DateTime, Duration, Utc, Weekday};
+use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use tokio::fs;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::RwLock;
 use tokio::time;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Pre-warm configuration.
 #[derive(Debug, Clone)]
@@ -306,5 +305,245 @@ impl PrewarmManager {
 
         self.prewarmed.clear();
         info!("Pre-warm manager stopped");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn create_test_predictor(path: &std::path::Path) -> Arc<UsagePredictor> {
+        Arc::new(UsagePredictor::new(path))
+    }
+
+    #[test]
+    fn test_prewarm_config_default() {
+        let config = PrewarmConfig::default();
+        assert_eq!(config.max_prewarmed, 10);
+        assert_eq!(config.threshold, 0.7);
+        assert_eq!(config.lookahead_seconds, 300);
+        assert_eq!(config.cleanup_interval_seconds, 60);
+        assert_eq!(config.prewarm_ttl_seconds, 600);
+    }
+
+    #[test]
+    fn test_prewarm_manager_new() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let manager = PrewarmManager::new(predictor, temp.path().join("prewarm"));
+
+        let (total, hits, misses, rate) = manager.stats();
+        assert_eq!(total, 0);
+        assert_eq!(hits, 0);
+        assert_eq!(misses, 0);
+        assert_eq!(rate, 0.0);
+    }
+
+    #[test]
+    fn test_prewarm_manager_with_config() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let config = PrewarmConfig {
+            max_prewarmed: 5,
+            threshold: 0.5,
+            lookahead_seconds: 120,
+            cleanup_interval_seconds: 30,
+            prewarm_ttl_seconds: 300,
+        };
+
+        let manager = PrewarmManager::with_config(predictor, temp.path(), config);
+        assert_eq!(manager.config.max_prewarmed, 5);
+        assert_eq!(manager.config.threshold, 0.5);
+    }
+
+    #[tokio::test]
+    async fn test_initialize_creates_directory() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let prewarm_dir = temp.path().join("prewarm_data");
+        let manager = PrewarmManager::new(predictor, &prewarm_dir);
+
+        manager.initialize().await.unwrap();
+        assert!(prewarm_dir.exists());
+    }
+
+    #[tokio::test]
+    async fn test_prewarm_container() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let manager = PrewarmManager::new(predictor, temp.path());
+        manager.initialize().await.unwrap();
+
+        let result = manager.prewarm("alpine:latest", 0.85).await;
+        assert!(result.is_ok());
+
+        let container_id = result.unwrap();
+        assert!(container_id.starts_with("prewarm-"));
+
+        let (total, _, _, _) = manager.stats();
+        assert_eq!(total, 1);
+    }
+
+    #[tokio::test]
+    async fn test_prewarm_duplicate_image() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let manager = PrewarmManager::new(predictor, temp.path());
+        manager.initialize().await.unwrap();
+
+        // First prewarm succeeds
+        manager.prewarm("nginx:latest", 0.9).await.unwrap();
+
+        // Second prewarm of same image fails
+        let result = manager.prewarm("nginx:latest", 0.95).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_prewarm_max_limit() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let config = PrewarmConfig {
+            max_prewarmed: 2,
+            ..Default::default()
+        };
+        let manager = PrewarmManager::with_config(predictor, temp.path(), config);
+        manager.initialize().await.unwrap();
+
+        // Fill up slots
+        manager.prewarm("img1:latest", 0.8).await.unwrap();
+        manager.prewarm("img2:latest", 0.8).await.unwrap();
+
+        // Third should fail
+        let result = manager.prewarm("img3:latest", 0.8).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_claim_prewarmed_container() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let manager = PrewarmManager::new(predictor, temp.path());
+        manager.initialize().await.unwrap();
+
+        // Prewarm a container
+        manager.prewarm("redis:latest", 0.9).await.unwrap();
+
+        // Claim it
+        let claimed = manager.claim("redis:latest").await;
+        assert!(claimed.is_some());
+
+        let (_, hits, _, _) = manager.stats();
+        assert_eq!(hits, 1);
+    }
+
+    #[tokio::test]
+    async fn test_claim_nonexistent_image() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let manager = PrewarmManager::new(predictor, temp.path());
+        manager.initialize().await.unwrap();
+
+        let claimed = manager.claim("nonexistent:latest").await;
+        assert!(claimed.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_claim_already_used() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let manager = PrewarmManager::new(predictor, temp.path());
+        manager.initialize().await.unwrap();
+
+        manager.prewarm("mysql:latest", 0.85).await.unwrap();
+
+        // First claim succeeds
+        let first = manager.claim("mysql:latest").await;
+        assert!(first.is_some());
+
+        // Second claim fails (already used)
+        let second = manager.claim("mysql:latest").await;
+        assert!(second.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_hit_rate_calculation() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let manager = PrewarmManager::new(predictor, temp.path());
+        manager.initialize().await.unwrap();
+
+        // No data yet
+        assert_eq!(manager.hit_rate(), 0.0);
+
+        // Prewarm and claim (hit)
+        manager.prewarm("hit:latest", 0.9).await.unwrap();
+        manager.claim("hit:latest").await;
+
+        let (_, hits, _, rate) = manager.stats();
+        assert_eq!(hits, 1);
+        // Rate only counts after cleanup categorizes misses
+    }
+
+    #[tokio::test]
+    async fn test_average_hit_score() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let manager = PrewarmManager::new(predictor, temp.path());
+        manager.initialize().await.unwrap();
+
+        // No hits yet
+        assert_eq!(manager.average_hit_score(), 0.0);
+
+        // Prewarm with known score and claim
+        manager.prewarm("score:latest", 0.75).await.unwrap();
+        manager.claim("score:latest").await;
+
+        let avg = manager.average_hit_score();
+        assert!((avg - 0.75).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn test_get_suggestions() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let manager = PrewarmManager::new(predictor, temp.path());
+        manager.initialize().await.unwrap();
+
+        // Currently returns empty vec (implementation placeholder)
+        let suggestions = manager.get_suggestions().await;
+        assert!(suggestions.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_stop_clears_prewarmed() {
+        let temp = tempdir().unwrap();
+        let predictor = create_test_predictor(temp.path());
+        let manager = PrewarmManager::new(predictor, temp.path());
+        manager.initialize().await.unwrap();
+
+        manager.prewarm("stop:latest", 0.8).await.unwrap();
+        assert_eq!(manager.prewarmed.len(), 1);
+
+        manager.stop().await;
+        assert_eq!(manager.prewarmed.len(), 0);
+    }
+
+    #[test]
+    fn test_prewarmed_container_struct() {
+        let now = Utc::now();
+        let container = PrewarmedContainer {
+            container_id: "test-123".to_string(),
+            image: "test:latest".to_string(),
+            prewarmed_at: now,
+            expires_at: now + Duration::seconds(600),
+            was_used: false,
+            prediction_score: 0.92,
+        };
+
+        assert!(!container.was_used);
+        assert!(container.expires_at > now);
+        assert_eq!(container.prediction_score, 0.92);
     }
 }

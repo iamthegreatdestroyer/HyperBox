@@ -299,3 +299,303 @@ impl UsagePredictor {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn make_event(image: &str, hour: u32, day: Weekday) -> UsageEvent {
+        let now = Utc::now();
+        let timestamp = now
+            .with_hour(hour)
+            .unwrap()
+            .with_minute(0)
+            .unwrap()
+            .with_second(0)
+            .unwrap();
+        UsageEvent {
+            image: image.to_string(),
+            timestamp,
+            duration_seconds: 300,
+            project_id: None,
+        }
+    }
+
+    #[test]
+    fn test_usage_predictor_new() {
+        let predictor = UsagePredictor::new("/tmp/test");
+        assert_eq!(predictor.model_count(), 0);
+        assert_eq!(predictor.predictions_count(), 0);
+    }
+
+    #[test]
+    fn test_record_event() {
+        let predictor = UsagePredictor::new("/tmp/test");
+        let event = UsageEvent {
+            image: "alpine:latest".to_string(),
+            timestamp: Utc::now(),
+            duration_seconds: 120,
+            project_id: Some("test-project".to_string()),
+        };
+
+        predictor.record(event);
+        assert_eq!(predictor.model_count(), 1);
+        assert!(predictor
+            .tracked_images()
+            .contains(&"alpine:latest".to_string()));
+    }
+
+    #[test]
+    fn test_record_multiple_events_same_image() {
+        let predictor = UsagePredictor::new("/tmp/test");
+
+        for i in 0..5 {
+            let event = UsageEvent {
+                image: "nginx:latest".to_string(),
+                timestamp: Utc::now() + Duration::hours(i),
+                duration_seconds: 60 + (i as u64 * 10),
+                project_id: None,
+            };
+            predictor.record(event);
+        }
+
+        assert_eq!(predictor.model_count(), 1);
+        let stats = predictor.model_stats("nginx:latest").unwrap();
+        assert_eq!(stats.0, 5); // total_count
+    }
+
+    #[test]
+    fn test_predict_no_data() {
+        let predictor = UsagePredictor::new("/tmp/test");
+        let prob = predictor.predict("nonexistent:latest", Utc::now());
+        assert_eq!(prob, 0.0);
+    }
+
+    #[test]
+    fn test_predict_insufficient_samples() {
+        let predictor = UsagePredictor::new("/tmp/test");
+
+        // Add fewer than MIN_SAMPLES events
+        for i in 0..5 {
+            let event = UsageEvent {
+                image: "test:latest".to_string(),
+                timestamp: Utc::now() + Duration::hours(i),
+                duration_seconds: 100,
+                project_id: None,
+            };
+            predictor.record(event);
+        }
+
+        // Should return 0.0 due to insufficient samples
+        let prob = predictor.predict("test:latest", Utc::now());
+        assert_eq!(prob, 0.0);
+    }
+
+    #[test]
+    fn test_predict_with_sufficient_samples() {
+        let predictor = UsagePredictor::new("/tmp/test");
+        let now = Utc::now();
+
+        // Add MIN_SAMPLES + 5 events at the same hour
+        for i in 0..15 {
+            let event = UsageEvent {
+                image: "redis:latest".to_string(),
+                timestamp: now + Duration::days(i),
+                duration_seconds: 200,
+                project_id: None,
+            };
+            predictor.record(event);
+        }
+
+        let prob = predictor.predict("redis:latest", now);
+        assert!(prob >= 0.0 && prob <= 1.0);
+    }
+
+    #[test]
+    fn test_predict_window() {
+        let predictor = UsagePredictor::new("/tmp/test");
+        let now = Utc::now();
+
+        // Add enough events
+        for i in 0..20 {
+            let event = UsageEvent {
+                image: "postgres:latest".to_string(),
+                timestamp: now + Duration::hours(i),
+                duration_seconds: 500,
+                project_id: None,
+            };
+            predictor.record(event);
+        }
+
+        let prob = predictor.predict_window("postgres:latest", 60);
+        assert!(prob >= 0.0 && prob <= 1.0);
+    }
+
+    #[test]
+    fn test_get_predictions() {
+        let predictor = UsagePredictor::new("/tmp/test");
+        let now = Utc::now();
+
+        // Add events for multiple images
+        for image in &["img1:latest", "img2:latest", "img3:latest"] {
+            for i in 0..15 {
+                let event = UsageEvent {
+                    image: image.to_string(),
+                    timestamp: now + Duration::hours(i),
+                    duration_seconds: 100,
+                    project_id: None,
+                };
+                predictor.record(event);
+            }
+        }
+
+        let predictions = predictor.get_predictions(60, 10);
+        assert!(predictions.len() <= 10);
+    }
+
+    #[test]
+    fn test_model_stats() {
+        let predictor = UsagePredictor::new("/tmp/test");
+        let event = UsageEvent {
+            image: "mysql:latest".to_string(),
+            timestamp: Utc::now(),
+            duration_seconds: 300,
+            project_id: None,
+        };
+
+        predictor.record(event);
+        let stats = predictor.model_stats("mysql:latest");
+
+        assert!(stats.is_some());
+        let (count, avg_duration, last_used) = stats.unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(avg_duration, 300.0);
+        assert!(last_used.is_some());
+    }
+
+    #[test]
+    fn test_tracked_images() {
+        let predictor = UsagePredictor::new("/tmp/test");
+
+        predictor.record(UsageEvent {
+            image: "a:latest".to_string(),
+            timestamp: Utc::now(),
+            duration_seconds: 100,
+            project_id: None,
+        });
+        predictor.record(UsageEvent {
+            image: "b:latest".to_string(),
+            timestamp: Utc::now(),
+            duration_seconds: 100,
+            project_id: None,
+        });
+
+        let images = predictor.tracked_images();
+        assert_eq!(images.len(), 2);
+        assert!(images.contains(&"a:latest".to_string()));
+        assert!(images.contains(&"b:latest".to_string()));
+    }
+
+    #[test]
+    fn test_predictions_count_increment() {
+        let predictor = UsagePredictor::new("/tmp/test");
+
+        assert_eq!(predictor.predictions_count(), 0);
+
+        predictor.predict("any:image", Utc::now());
+        assert_eq!(predictor.predictions_count(), 1);
+
+        predictor.predict("other:image", Utc::now());
+        assert_eq!(predictor.predictions_count(), 2);
+    }
+
+    #[test]
+    fn test_time_features_weekend() {
+        // Sunday
+        let sunday = Utc::now().with_ordinal(7).unwrap_or(Utc::now());
+        let features = TimeFeatures::from_datetime(sunday);
+        // Just verify the struct is created correctly
+        assert!(features.hour < 24);
+        assert!(features.day_of_week < 7);
+    }
+
+    #[tokio::test]
+    async fn test_initialize_creates_directory() {
+        let temp = tempdir().unwrap();
+        let predictor = UsagePredictor::new(temp.path().join("models"));
+
+        predictor.initialize().await.unwrap();
+
+        assert!(temp.path().join("models").exists());
+    }
+
+    #[tokio::test]
+    async fn test_save_and_load() {
+        let temp = tempdir().unwrap();
+        let predictor = UsagePredictor::new(temp.path());
+
+        predictor.initialize().await.unwrap();
+
+        // Add some data
+        for i in 0..5 {
+            predictor.record(UsageEvent {
+                image: "test:latest".to_string(),
+                timestamp: Utc::now() + Duration::hours(i),
+                duration_seconds: 100,
+                project_id: None,
+            });
+        }
+
+        // Save
+        predictor.save().await.unwrap();
+
+        // Verify file exists
+        assert!(temp.path().join("models.json").exists());
+
+        // Create new predictor and load
+        let predictor2 = UsagePredictor::new(temp.path());
+        predictor2.initialize().await.unwrap();
+
+        assert_eq!(predictor2.model_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_train_insufficient_data() {
+        let temp = tempdir().unwrap();
+        let predictor = UsagePredictor::new(temp.path());
+        predictor.initialize().await.unwrap();
+
+        let events: Vec<UsageEvent> = (0..5)
+            .map(|i| UsageEvent {
+                image: "test:latest".to_string(),
+                timestamp: Utc::now() + Duration::hours(i),
+                duration_seconds: 100,
+                project_id: None,
+            })
+            .collect();
+
+        let result = predictor.train(events).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_train_sufficient_data() {
+        let temp = tempdir().unwrap();
+        let predictor = UsagePredictor::new(temp.path());
+        predictor.initialize().await.unwrap();
+
+        let events: Vec<UsageEvent> = (0..15)
+            .map(|i| UsageEvent {
+                image: "train:latest".to_string(),
+                timestamp: Utc::now() + Duration::hours(i),
+                duration_seconds: 100,
+                project_id: None,
+            })
+            .collect();
+
+        let result = predictor.train(events).await;
+        assert!(result.is_ok());
+        assert!(predictor.model_count() >= 1);
+    }
+}

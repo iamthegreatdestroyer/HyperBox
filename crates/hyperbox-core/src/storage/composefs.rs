@@ -3,8 +3,8 @@
 //! Composefs provides content-addressed filesystem mounting with
 //! automatic deduplication and verification.
 
-use crate::error::{CoreError, Result};
-use std::path::{Path, PathBuf};
+use crate::error::Result;
+use std::path::PathBuf;
 use std::process::Command;
 use tokio::fs;
 use tracing::{debug, info};
@@ -149,8 +149,8 @@ impl ComposefsManager {
 
     /// Garbage collect unused objects.
     pub async fn gc(&self, used_digests: &[String]) -> Result<GcResult> {
-        let mut removed_count = 0u64;
-        let mut freed_bytes = 0u64;
+        let removed_count = 0u64;
+        let freed_bytes = 0u64;
 
         // Would walk objects directory and remove unused
         // Simplified implementation

@@ -4,9 +4,11 @@
 
 use crate::error::{CoreError, Result};
 use dashmap::DashMap;
+use flate2::read::GzDecoder;
 use sha2::{Digest, Sha256};
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use tar::Archive;
 use tokio::fs;
 use tracing::{debug, info};
 
@@ -133,8 +135,29 @@ impl LayerStore {
 
         fs::create_dir_all(target).await?;
 
-        // Would extract tar here using tar crate
-        // Simplified for now
+        // Read the layer blob
+        let data = fs::read(&blob_path).await?;
+
+        // Decompress if gzipped
+        let decompressed = if data.starts_with(&[0x1f, 0x8b]) {
+            // GZip magic bytes
+            let mut decoder = GzDecoder::new(&data[..]);
+            let mut decompressed = Vec::new();
+            decoder
+                .read_to_end(&mut decompressed)
+                .map_err(|e| CoreError::StorageOperation(format!("decompress layer: {}", e)))?;
+            decompressed
+        } else {
+            data
+        };
+
+        // Extract tar archive
+        let mut archive = Archive::new(&decompressed[..]);
+
+        archive
+            .unpack(target)
+            .map_err(|e| CoreError::StorageOperation(format!("extract tar: {}", e)))?;
+
         debug!("Extracted layer {} to {:?}", digest, target);
         Ok(())
     }

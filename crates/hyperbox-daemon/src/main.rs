@@ -8,9 +8,9 @@
 //! - Health monitoring and metrics
 
 use anyhow::Result;
-use std::path::PathBuf;
+use clap::Parser;
 use tokio::signal;
-use tracing::{info, warn};
+use tracing::info;
 
 mod api;
 mod config;
@@ -24,10 +24,41 @@ mod state;
 use config::DaemonConfig;
 use state::DaemonState;
 
+/// HyperBox Daemon - Background service for container management
+#[derive(Parser, Debug)]
+#[command(name = "hyperboxd")]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Path to configuration file
+    #[arg(short, long)]
+    config: Option<std::path::PathBuf>,
+
+    /// Run in foreground (don't daemonize)
+    #[arg(short, long)]
+    foreground: bool,
+
+    /// Log level (trace, debug, info, warn, error)
+    #[arg(short, long, default_value = "info")]
+    log_level: String,
+
+    /// Show configuration and exit
+    #[arg(long)]
+    show_config: bool,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging
-    init_logging();
+    let args = Args::parse();
+
+    // Handle --show-config before anything else
+    if args.show_config {
+        let config = DaemonConfig::load()?;
+        println!("{}", toml::to_string_pretty(&config)?);
+        return Ok(());
+    }
+
+    // Initialize logging with the specified level
+    init_logging(&args.log_level);
 
     info!("Starting HyperBox daemon v{}", env!("CARGO_PKG_VERSION"));
 
@@ -67,9 +98,9 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn init_logging() {
+fn init_logging(level: &str) {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(level));
 
     tracing_subscriber::fmt()
         .with_env_filter(env_filter)

@@ -36,6 +36,7 @@ pub mod config;
 pub mod detection;
 pub mod error;
 pub mod manager;
+pub mod orchestration;
 pub mod ports;
 pub mod resources;
 #[cfg(feature = "watch")]
@@ -45,6 +46,7 @@ pub use config::ProjectConfig;
 pub use detection::ProjectDetector;
 pub use error::{ProjectError, Result};
 pub use manager::ProjectManager;
+pub use orchestration::ProjectOrchestrator;
 pub use ports::ProjectPortManager;
 pub use resources::ResourcePool;
 

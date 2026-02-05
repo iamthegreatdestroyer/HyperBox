@@ -10,12 +10,14 @@
 //! hb project stop                # Stop the current project
 //! hb container list              # List all containers
 //! hb image pull nginx            # Pull an image
+//! hb docker run nginx            # Docker-compatible mode
 //! ```
 
 use anyhow::Result;
 use clap::Parser;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+pub mod client;
 mod commands;
 
 use commands::{Cli, Commands};
@@ -35,6 +37,12 @@ async fn main() -> Result<()> {
         Commands::Image(cmd) => commands::image::run(cmd).await,
         Commands::System(cmd) => commands::system::run(cmd).await,
         Commands::Completion(cmd) => commands::completion::run(cmd),
+        Commands::Docker(cmd) => {
+            cmd.execute(cli.output)
+                .await
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+            Ok(())
+        }
     }
 }
 

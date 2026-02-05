@@ -82,9 +82,7 @@ impl CriuManager {
             self.criu_path = Some(path.clone());
 
             // Verify CRIU works
-            let output = Command::new(&path)
-                .arg("check")
-                .output();
+            let output = Command::new(&path).arg("check").output();
 
             match output {
                 Ok(output) if output.status.success() => {
@@ -159,9 +157,12 @@ impl CriuManager {
         // Build CRIU command
         let mut cmd = Command::new(criu);
         cmd.arg("dump")
-            .arg("-t").arg(pid.to_string())
-            .arg("-D").arg(&checkpoint_path)
-            .arg("-o").arg("dump.log")
+            .arg("-t")
+            .arg(pid.to_string())
+            .arg("-D")
+            .arg(&checkpoint_path)
+            .arg("-o")
+            .arg("dump.log")
             .arg("--shell-job");
 
         if options.leave_running {
@@ -225,10 +226,7 @@ impl CriuManager {
     }
 
     /// Restore a container from checkpoint.
-    pub async fn restore(
-        &self,
-        checkpoint: &Checkpoint,
-    ) -> Result<u32> {
+    pub async fn restore(&self, checkpoint: &Checkpoint) -> Result<u32> {
         if !self.is_available() {
             return Err(OptimizeError::CriuNotAvailable {
                 reason: "CRIU not installed or not functional".to_string(),
@@ -254,8 +252,10 @@ impl CriuManager {
 
         let mut cmd = Command::new(criu);
         cmd.arg("restore")
-            .arg("-D").arg(&checkpoint.path)
-            .arg("-o").arg("restore.log")
+            .arg("-D")
+            .arg(&checkpoint.path)
+            .arg("-o")
+            .arg("restore.log")
             .arg("--shell-job")
             .arg("-d");
 
@@ -284,10 +284,7 @@ impl CriuManager {
         // Parse PID from output
         let pid = Self::parse_restored_pid(&checkpoint.path).await?;
 
-        info!(
-            "Restored container {} (PID {}) in {:?}",
-            checkpoint.container_id, pid, duration
-        );
+        info!("Restored container {} (PID {}) in {:?}", checkpoint.container_id, pid, duration);
 
         Ok(pid)
     }
@@ -412,5 +409,176 @@ impl CriuManager {
         }
 
         Ok(size)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_criu_manager_creation() {
+        let dir = tempdir().unwrap();
+        let manager = CriuManager::new(dir.path());
+
+        // Before initialization, CRIU is not marked as available
+        assert!(!manager.is_available());
+    }
+
+    #[tokio::test]
+    async fn test_criu_manager_initialize() {
+        let dir = tempdir().unwrap();
+        let mut manager = CriuManager::new(dir.path());
+
+        // Initialize should succeed even if CRIU isn't installed
+        let result = manager.initialize().await;
+        assert!(result.is_ok());
+
+        // Checkpoint directory should be created
+        assert!(dir.path().exists());
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_metadata_serialization() {
+        let checkpoint = Checkpoint {
+            container_id: "test-container-123".to_string(),
+            image: "alpine:latest".to_string(),
+            path: PathBuf::from("/tmp/checkpoints/test"),
+            created_at: Utc::now(),
+            size: 1024 * 1024,
+            includes_tcp: false,
+            includes_file_locks: false,
+        };
+
+        let json = serde_json::to_string(&checkpoint).unwrap();
+        let deserialized: Checkpoint = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(checkpoint.container_id, deserialized.container_id);
+        assert_eq!(checkpoint.image, deserialized.image);
+        assert_eq!(checkpoint.size, deserialized.size);
+    }
+
+    #[tokio::test]
+    async fn test_criu_options_default() {
+        let options = CriuOptions::default();
+
+        assert!(!options.leave_running);
+        assert!(!options.tcp_established);
+        assert!(!options.file_locks);
+        assert!(options.external_mounts.is_empty());
+        assert!(!options.pre_dump);
+    }
+
+    #[tokio::test]
+    async fn test_list_checkpoints_empty() {
+        let dir = tempdir().unwrap();
+        let mut manager = CriuManager::new(dir.path());
+        manager.initialize().await.unwrap();
+
+        let checkpoints = manager.list_checkpoints().await.unwrap();
+        assert!(checkpoints.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_checkpoint_not_found() {
+        let dir = tempdir().unwrap();
+        let mut manager = CriuManager::new(dir.path());
+        manager.initialize().await.unwrap();
+
+        let result = manager.get_checkpoint("nonexistent").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_checkpoint_nonexistent() {
+        let dir = tempdir().unwrap();
+        let mut manager = CriuManager::new(dir.path());
+        manager.initialize().await.unwrap();
+
+        // Should not error when deleting nonexistent checkpoint
+        let result = manager.delete_checkpoint("nonexistent").await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_directory_size_empty() {
+        let dir = tempdir().unwrap();
+        let size = CriuManager::directory_size(dir.path()).await.unwrap();
+        assert_eq!(size, 0);
+    }
+
+    #[tokio::test]
+    async fn test_directory_size_with_files() {
+        let dir = tempdir().unwrap();
+
+        // Create test files
+        fs::write(dir.path().join("file1.txt"), "hello")
+            .await
+            .unwrap();
+        fs::write(dir.path().join("file2.txt"), "world!")
+            .await
+            .unwrap();
+
+        let size = CriuManager::directory_size(dir.path()).await.unwrap();
+        assert_eq!(size, 11); // "hello" (5) + "world!" (6)
+    }
+
+    #[tokio::test]
+    async fn test_find_criu_returns_option() {
+        // This test just verifies the function runs without panicking
+        let _result = CriuManager::find_criu();
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_without_criu_fails() {
+        let dir = tempdir().unwrap();
+        let manager = CriuManager::new(dir.path());
+
+        let options = CriuOptions::default();
+        let result = manager
+            .checkpoint("test", "alpine:latest", 1234, &options)
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            OptimizeError::CriuNotAvailable { .. } => (),
+            _ => panic!("Expected CriuNotAvailable error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_restore_without_criu_fails() {
+        let dir = tempdir().unwrap();
+        let manager = CriuManager::new(dir.path());
+
+        let checkpoint = Checkpoint {
+            container_id: "test".to_string(),
+            image: "alpine:latest".to_string(),
+            path: dir.path().to_path_buf(),
+            created_at: Utc::now(),
+            size: 0,
+            includes_tcp: false,
+            includes_file_locks: false,
+        };
+
+        let result = manager.restore(&checkpoint).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_age_validation() {
+        let old_checkpoint = Checkpoint {
+            container_id: "old".to_string(),
+            image: "alpine:latest".to_string(),
+            path: PathBuf::from("/tmp/old"),
+            created_at: Utc::now() - chrono::Duration::hours(48),
+            size: 0,
+            includes_tcp: false,
+            includes_file_locks: false,
+        };
+
+        let age = Utc::now().signed_duration_since(old_checkpoint.created_at);
+        assert!(age.to_std().unwrap() > MAX_CHECKPOINT_AGE);
     }
 }

@@ -114,11 +114,17 @@ impl BridgeNetwork {
         // Add MASQUERADE rule for the subnet
         let output = Command::new("iptables")
             .args([
-                "-t", "nat",
-                "-A", "POSTROUTING",
-                "-s", &self.subnet,
-                "!", "-o", &self.name,
-                "-j", "MASQUERADE",
+                "-t",
+                "nat",
+                "-A",
+                "POSTROUTING",
+                "-s",
+                &self.subnet,
+                "!",
+                "-o",
+                &self.name,
+                "-j",
+                "MASQUERADE",
             ])
             .output()
             .map_err(|e| CoreError::NetworkConfiguration(e.to_string()))?;
@@ -133,19 +139,11 @@ impl BridgeNetwork {
 
         // Allow forwarding to/from the bridge
         let _ = Command::new("iptables")
-            .args([
-                "-A", "FORWARD",
-                "-i", &self.name,
-                "-j", "ACCEPT",
-            ])
+            .args(["-A", "FORWARD", "-i", &self.name, "-j", "ACCEPT"])
             .output();
 
         let _ = Command::new("iptables")
-            .args([
-                "-A", "FORWARD",
-                "-o", &self.name,
-                "-j", "ACCEPT",
-            ])
+            .args(["-A", "FORWARD", "-o", &self.name, "-j", "ACCEPT"])
             .output();
 
         Ok(())
@@ -163,11 +161,17 @@ impl BridgeNetwork {
         // Remove NAT rules
         let _ = Command::new("iptables")
             .args([
-                "-t", "nat",
-                "-D", "POSTROUTING",
-                "-s", &self.subnet,
-                "!", "-o", &self.name,
-                "-j", "MASQUERADE",
+                "-t",
+                "nat",
+                "-D",
+                "POSTROUTING",
+                "-s",
+                &self.subnet,
+                "!",
+                "-o",
+                &self.name,
+                "-j",
+                "MASQUERADE",
             ])
             .output();
 
@@ -199,9 +203,7 @@ impl BridgeNetwork {
         let host_part = NEXT_IP.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
         if host_part > 65534 {
-            return Err(CoreError::NetworkConfiguration(
-                "IP address pool exhausted".to_string(),
-            ));
+            return Err(CoreError::NetworkConfiguration("IP address pool exhausted".to_string()));
         }
 
         // 172.20.x.y

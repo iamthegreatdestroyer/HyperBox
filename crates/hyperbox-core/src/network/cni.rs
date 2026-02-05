@@ -1,10 +1,9 @@
 //! CNI (Container Network Interface) integration.
 
-use crate::error::{CoreError, Result};
+use crate::error::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 use tracing::{debug, info};
 
 /// CNI plugin paths.
@@ -255,10 +254,7 @@ impl CniManager {
             return Ok(()); // Plugin not found, nothing to clean up
         }
 
-        info!(
-            "Removing container {} from network {}",
-            container_id, config.name
-        );
+        info!("Removing container {} from network {}", container_id, config.name);
 
         let output = Command::new(&plugin_path)
             .env("CNI_COMMAND", "DEL")
@@ -270,10 +266,7 @@ impl CniManager {
             .map_err(|e| CoreError::NetworkConfiguration(e.to_string()))?;
 
         if !output.status.success() {
-            debug!(
-                "CNI DEL warning: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
+            debug!("CNI DEL warning: {}", String::from_utf8_lossy(&output.stderr));
         }
 
         Ok(())

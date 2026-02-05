@@ -5,6 +5,8 @@ use clap::{Args, Subcommand};
 use colored::*;
 use tabled::{Table, Tabled};
 
+use crate::client::{CreateContainerRequest, DaemonClient, PortMappingRequest};
+
 /// Container management commands.
 #[derive(Args)]
 pub struct ContainerCommand {
@@ -188,22 +190,68 @@ pub enum ContainerAction {
 
 pub async fn run(cmd: ContainerCommand) -> Result<()> {
     match cmd.action {
-        ContainerAction::List { all, project, quiet } => list_containers(all, project, quiet).await,
-        ContainerAction::Run { image, name, port, volume, env, detach, rm, interactive, tty, workdir, command } => {
-            run_container(image, name, port, volume, env, detach, rm, interactive, tty, workdir, command).await
+        ContainerAction::List {
+            all,
+            project,
+            quiet,
+        } => list_containers(all, project, quiet).await,
+        ContainerAction::Run {
+            image,
+            name,
+            port,
+            volume,
+            env,
+            detach,
+            rm,
+            interactive,
+            tty,
+            workdir,
+            command,
+        } => {
+            run_container(
+                image,
+                name,
+                port,
+                volume,
+                env,
+                detach,
+                rm,
+                interactive,
+                tty,
+                workdir,
+                command,
+            )
+            .await
         }
         ContainerAction::Start { container } => start_container(container).await,
         ContainerAction::Stop { container, timeout } => stop_container(container, timeout).await,
-        ContainerAction::Restart { container, timeout } => restart_container(container, timeout).await,
-        ContainerAction::Remove { containers, force, volumes } => remove_containers(containers, force, volumes).await,
-        ContainerAction::Exec { container, interactive, tty, workdir, env, command } => {
-            exec_container(container, interactive, tty, workdir, env, command).await
+        ContainerAction::Restart { container, timeout } => {
+            restart_container(container, timeout).await
         }
-        ContainerAction::Logs { container, follow, tail, timestamps } => {
-            show_logs(container, follow, tail, timestamps).await
-        }
+        ContainerAction::Remove {
+            containers,
+            force,
+            volumes,
+        } => remove_containers(containers, force, volumes).await,
+        ContainerAction::Exec {
+            container,
+            interactive,
+            tty,
+            workdir,
+            env,
+            command,
+        } => exec_container(container, interactive, tty, workdir, env, command).await,
+        ContainerAction::Logs {
+            container,
+            follow,
+            tail,
+            timestamps,
+        } => show_logs(container, follow, tail, timestamps).await,
         ContainerAction::Inspect { container } => inspect_container(container).await,
-        ContainerAction::Stats { containers, no_stream } => show_stats(containers, no_stream).await,
+        ContainerAction::Stats {
+            containers,
+            no_stream,
+        } => show_stats(containers, no_stream).await,
         ContainerAction::Cp { source, dest } => copy_files(source, dest).await,
     }
 }
@@ -223,29 +271,58 @@ struct ContainerInfo {
 }
 
 async fn list_containers(all: bool, project: Option<String>, quiet: bool) -> Result<()> {
-    let containers = vec![
-        ContainerInfo {
-            id: "a1b2c3d4".to_string(),
-            image: "node:20".to_string(),
-            status: "Up 2 minutes".green().to_string(),
-            ports: "3000:3000".to_string(),
-            name: "my-app_web_1".to_string(),
-        },
-        ContainerInfo {
-            id: "e5f6g7h8".to_string(),
-            image: "postgres:15".to_string(),
-            status: "Up 2 minutes".green().to_string(),
-            ports: "5432:5432".to_string(),
-            name: "my-app_db_1".to_string(),
-        },
-    ];
+    let client = DaemonClient::new();
+
+    // Check if daemon is running
+    if !client.is_running().await {
+        eprintln!("{} Daemon is not running. Start it with: hyperboxd", "✗".red());
+        eprintln!("{} Or use: hb system start-daemon", "→".blue());
+        return Ok(());
+    }
+
+    let containers = client.list_containers(all).await?;
+
+    // Filter by project if specified
+    let containers: Vec<_> = if let Some(ref proj) = project {
+        containers
+            .into_iter()
+            .filter(|c| c.name.as_ref().map(|n| n.contains(proj)).unwrap_or(false))
+            .collect()
+    } else {
+        containers
+    };
 
     if quiet {
         for c in &containers {
             println!("{}", c.id);
         }
+    } else if containers.is_empty() {
+        println!("{}", "No containers found".dimmed());
     } else {
-        let table = Table::new(containers).to_string();
+        let display: Vec<ContainerInfo> = containers
+            .iter()
+            .map(|c| {
+                let ports = c
+                    .ports
+                    .iter()
+                    .map(|p| format!("{}:{}", p.host, p.container))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                ContainerInfo {
+                    id: c.id.chars().take(12).collect(),
+                    image: c.image.clone(),
+                    status: if c.status == "running" {
+                        c.status.clone().green().to_string()
+                    } else {
+                        c.status.clone().yellow().to_string()
+                    },
+                    ports,
+                    name: c.name.clone().unwrap_or_else(|| "-".to_string()),
+                }
+            })
+            .collect();
+
+        let table = Table::new(display).to_string();
         println!("{}", table);
     }
 
@@ -265,35 +342,128 @@ async fn run_container(
     workdir: Option<String>,
     command: Vec<String>,
 ) -> Result<()> {
-    let container_name = name.unwrap_or_else(|| format!("hb-{}", uuid::Uuid::new_v4().to_string()[..8].to_string()));
+    let client = DaemonClient::new();
 
-    println!("{} Starting container {}...", "→".blue(), container_name.cyan());
+    // Check if daemon is running
+    if !client.is_running().await {
+        eprintln!("{} Daemon is not running. Start it with: hyperboxd", "✗".red());
+        return Err(anyhow::anyhow!("Daemon not running"));
+    }
+
+    // Parse port mappings
+    let port_mappings: Option<Vec<PortMappingRequest>> = if ports.is_empty() {
+        None
+    } else {
+        Some(
+            ports
+                .iter()
+                .filter_map(|p| {
+                    let parts: Vec<&str> = p.split(':').collect();
+                    if parts.len() == 2 {
+                        Some(PortMappingRequest {
+                            host: parts[0].parse().ok()?,
+                            container: parts[1].parse().ok()?,
+                            protocol: Some("tcp".to_string()),
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        )
+    };
+
+    let container_name = name
+        .clone()
+        .unwrap_or_else(|| format!("hb-{}", uuid::Uuid::new_v4().to_string()[..8].to_string()));
+
+    println!("{} Creating container {}...", "→".blue(), container_name.cyan());
+
+    let req = CreateContainerRequest {
+        image: image.clone(),
+        name: Some(container_name.clone()),
+        env: if env.is_empty() { None } else { Some(env) },
+        ports: port_mappings,
+        volumes: if volumes.is_empty() {
+            None
+        } else {
+            Some(volumes)
+        },
+        command: if command.is_empty() {
+            None
+        } else {
+            Some(command)
+        },
+    };
+
+    let container_id = client.create_container(req).await?;
+    println!(
+        "{} Container created: {}",
+        "✓".green(),
+        container_id.chars().take(12).collect::<String>().cyan()
+    );
+
+    // Start the container
+    println!("{} Starting container...", "→".blue());
+    client.start_container(&container_id).await?;
     println!("{} Container started: {}", "✓".green(), container_name.cyan());
 
     Ok(())
 }
 
 async fn start_container(container: String) -> Result<()> {
+    let client = DaemonClient::new();
+
+    if !client.is_running().await {
+        eprintln!("{} Daemon is not running. Start it with: hyperboxd", "✗".red());
+        return Err(anyhow::anyhow!("Daemon not running"));
+    }
+
     println!("{} Starting container {}...", "→".blue(), container.cyan());
+    client.start_container(&container).await?;
     println!("{} Container started", "✓".green());
     Ok(())
 }
 
 async fn stop_container(container: String, timeout: u64) -> Result<()> {
+    let client = DaemonClient::new();
+
+    if !client.is_running().await {
+        eprintln!("{} Daemon is not running. Start it with: hyperboxd", "✗".red());
+        return Err(anyhow::anyhow!("Daemon not running"));
+    }
+
     println!("{} Stopping container {}...", "→".blue(), container.cyan());
+    client.stop_container(&container, timeout).await?;
     println!("{} Container stopped", "✓".green());
     Ok(())
 }
 
 async fn restart_container(container: String, timeout: u64) -> Result<()> {
-    stop_container(container.clone(), timeout).await?;
-    start_container(container).await?;
+    let client = DaemonClient::new();
+
+    if !client.is_running().await {
+        eprintln!("{} Daemon is not running. Start it with: hyperboxd", "✗".red());
+        return Err(anyhow::anyhow!("Daemon not running"));
+    }
+
+    println!("{} Restarting container {}...", "→".blue(), container.cyan());
+    client.restart_container(&container).await?;
+    println!("{} Container restarted", "✓".green());
     Ok(())
 }
 
 async fn remove_containers(containers: Vec<String>, force: bool, volumes: bool) -> Result<()> {
+    let client = DaemonClient::new();
+
+    if !client.is_running().await {
+        eprintln!("{} Daemon is not running. Start it with: hyperboxd", "✗".red());
+        return Err(anyhow::anyhow!("Daemon not running"));
+    }
+
     for container in &containers {
         println!("{} Removing container {}...", "→".blue(), container.cyan());
+        client.remove_container(container, force).await?;
     }
     println!("{} Removed {} container(s)", "✓".green(), containers.len());
     Ok(())
@@ -318,34 +488,85 @@ async fn exec_container(
 }
 
 async fn show_logs(container: String, follow: bool, tail: usize, timestamps: bool) -> Result<()> {
-    println!("{}", "[2024-01-15 10:30:00] Server started on port 3000".cyan());
-    println!("{}", "[2024-01-15 10:30:01] Database connected".cyan());
-    println!("{}", "[2024-01-15 10:30:02] Ready to accept connections".cyan());
+    use futures::StreamExt;
+
+    let client = DaemonClient::new();
+
+    if !client.is_running().await {
+        eprintln!("{} Daemon is not running. Start it with: hyperboxd", "✗".red());
+        return Err(anyhow::anyhow!("Daemon not running"));
+    }
+
+    let tail_option = if tail > 0 { Some(tail) } else { None };
 
     if follow {
+        // Use SSE streaming for follow mode
+        println!("{}", "Streaming logs... Press Ctrl+C to stop".dimmed());
         println!();
-        println!("{}", "Following logs... Press Ctrl+C to stop".dimmed());
+
+        match client
+            .stream_logs(&container, tail_option, timestamps)
+            .await
+        {
+            Ok(stream) => {
+                tokio::pin!(stream);
+
+                while let Some(result) = stream.next().await {
+                    match result {
+                        Ok(line) => println!("{}", line),
+                        Err(e) => {
+                            let msg = e.to_string();
+                            if msg.contains("Stream ended") {
+                                // Normal end of stream
+                                break;
+                            }
+                            eprintln!("{} {}", "✗".red(), msg);
+                            break;
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("{} Failed to start log stream: {}", "✗".red(), e);
+                return Err(e);
+            }
+        }
+    } else {
+        // Non-follow mode: get snapshot of logs
+        let logs = client.get_logs(&container, tail_option, timestamps).await?;
+
+        if logs.is_empty() {
+            println!("{} No logs available for container {}", "ℹ".blue(), container.cyan());
+        } else {
+            for line in &logs {
+                println!("{}", line);
+            }
+        }
     }
 
     Ok(())
 }
 
 async fn inspect_container(container: String) -> Result<()> {
-    println!("{}", serde_json::json!({
-        "Id": "a1b2c3d4e5f6g7h8",
-        "Name": "my-app_web_1",
-        "Image": "node:20",
-        "State": {
-            "Status": "running",
-            "Running": true,
-            "Pid": 12345
-        },
-        "NetworkSettings": {
-            "Ports": {
-                "3000/tcp": [{"HostPort": "3000"}]
+    println!(
+        "{}",
+        serde_json::json!({
+            "Id": "a1b2c3d4e5f6g7h8",
+            "Name": "my-app_web_1",
+            "Image": "node:20",
+            "State": {
+                "Status": "running",
+                "Running": true,
+                "Pid": 12345
+            },
+            "NetworkSettings": {
+                "Ports": {
+                    "3000/tcp": [{"HostPort": "3000"}]
+                }
             }
-        }
-    }).to_string());
+        })
+        .to_string()
+    );
 
     Ok(())
 }

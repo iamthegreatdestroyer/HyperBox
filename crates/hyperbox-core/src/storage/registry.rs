@@ -3,11 +3,14 @@
 //! Supports pulling images from OCI-compliant registries.
 
 use crate::error::{CoreError, Result};
-use crate::storage::{Descriptor, ImageConfig, ImageManifest};
+use crate::storage::{ImageConfig, ImageManifest};
+use flate2::read::GzDecoder;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashMap;
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use tar::Archive;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tracing::{debug, info};
@@ -66,15 +69,16 @@ impl ImageRegistry {
             name = parts[1].to_string();
         }
 
-        // Check for tag or digest
-        if let Some(idx) = name.rfind(':') {
+        // Check for digest (@ takes precedence over :)
+        if let Some(idx) = name.find('@') {
+            tag = name[idx + 1..].to_string(); // sha256:abc123
+            name = name[..idx].to_string(); // alpine
+        } else if let Some(idx) = name.rfind(':') {
+            // Check for tag (not port in registry hostname)
             if !name[idx..].contains('/') {
                 tag = name[idx + 1..].to_string();
                 name = name[..idx].to_string();
             }
-        } else if let Some(idx) = name.find('@') {
-            tag = name[idx + 1..].to_string();
-            name = name[..idx].to_string();
         }
 
         // Add library/ prefix for Docker Hub official images
@@ -283,6 +287,45 @@ impl ImageRegistry {
             config,
             layer_paths,
         })
+    }
+
+    /// Extract image layers to a rootfs directory.
+    pub async fn extract_to_rootfs(&self, pulled: &PulledImage, rootfs: &Path) -> Result<()> {
+        fs::create_dir_all(rootfs).await?;
+
+        info!("Extracting {} layers to {:?}", pulled.layer_paths.len(), rootfs);
+
+        for (idx, layer_path) in pulled.layer_paths.iter().enumerate() {
+            debug!("Extracting layer {}/{}: {:?}", idx + 1, pulled.layer_paths.len(), layer_path);
+
+            // Read the layer blob
+            let data = fs::read(layer_path).await?;
+
+            // Decompress if gzipped
+            let decompressed = if data.starts_with(&[0x1f, 0x8b]) {
+                // GZip magic bytes
+                let mut decoder = GzDecoder::new(&data[..]);
+                let mut decompressed = Vec::new();
+                decoder
+                    .read_to_end(&mut decompressed)
+                    .map_err(|e| CoreError::StorageOperation(format!("decompress layer: {}", e)))?;
+                decompressed
+            } else {
+                data
+            };
+
+            // Extract tar archive
+            let mut archive = Archive::new(&decompressed[..]);
+
+            archive.unpack(rootfs).map_err(|e| {
+                CoreError::StorageOperation(format!("extract tar layer {}: {}", idx, e))
+            })?;
+
+            debug!("Extracted layer {}/{}", idx + 1, pulled.layer_paths.len());
+        }
+
+        info!("Successfully extracted image to {:?}", rootfs);
+        Ok(())
     }
 }
 

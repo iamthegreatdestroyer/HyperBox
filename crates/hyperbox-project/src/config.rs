@@ -152,25 +152,29 @@ impl Default for NetworkDef {
 /// Health check configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthCheck {
-    /// Check command
-    pub cmd: Vec<String>,
-    /// Interval between checks
-    pub interval: u64,
-    /// Timeout for check
-    pub timeout: u64,
+    /// Check command/test
+    pub test: Vec<String>,
+    /// Interval between checks (e.g., "30s")
+    pub interval: String,
+    /// Timeout for check (e.g., "10s")
+    pub timeout: String,
     /// Retries before unhealthy
     pub retries: u32,
-    /// Start period
-    pub start_period: u64,
+    /// Start period (e.g., "5s")
+    pub start_period: Option<String>,
 }
 
 /// Resource limits definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceDef {
     /// CPU limit (e.g., "0.5" for half a CPU)
-    pub cpu: Option<String>,
+    pub cpu_limit: Option<String>,
     /// Memory limit (e.g., "512m")
-    pub memory: Option<String>,
+    pub memory_limit: Option<String>,
+    /// CPU reservation
+    pub cpu_reservation: Option<String>,
+    /// Memory reservation
+    pub memory_reservation: Option<String>,
 }
 
 /// Build configuration.

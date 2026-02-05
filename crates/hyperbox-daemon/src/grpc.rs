@@ -2,7 +2,6 @@
 
 use crate::state::DaemonState;
 use std::net::SocketAddr;
-use tonic::transport::Server;
 use tracing::info;
 
 /// Serve the gRPC API.

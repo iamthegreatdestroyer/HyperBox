@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useSystemStore } from "../stores/system";
 import { clsx } from "clsx";
+import UpdateChecker from "./UpdateChecker";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -91,6 +92,9 @@ export default function Layout({ children }: LayoutProps) {
       <main className="flex-1 overflow-auto">
         <div className="p-8">{children}</div>
       </main>
+
+      {/* Update Notification */}
+      <UpdateChecker />
     </div>
   );
 }

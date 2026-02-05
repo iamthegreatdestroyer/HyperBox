@@ -1,10 +1,10 @@
 //! Container lifecycle management.
 
-use crate::state::{ContainerState, ContainerStatus, DaemonState, EventType, PortMapping};
+use crate::state::{ContainerState, ContainerStatus, DaemonState, EventType};
 use chrono::Utc;
 use hyperbox_optimize::predict::UsageEvent;
 use std::time::Duration;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Manage container lifecycles.
 pub async fn manager(state: DaemonState) -> anyhow::Result<()> {

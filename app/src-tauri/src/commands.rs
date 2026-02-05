@@ -145,14 +145,8 @@ pub async fn create_container(
 }
 
 #[tauri::command]
-pub async fn start_container(
-    state: State<'_, Arc<AppState>>,
-    id: String,
-) -> Result<(), String> {
-    state
-        .start_container(&id)
-        .await
-        .map_err(|e| e.to_string())
+pub async fn start_container(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
+    state.start_container(&id).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -168,10 +162,7 @@ pub async fn stop_container(
 }
 
 #[tauri::command]
-pub async fn restart_container(
-    state: State<'_, Arc<AppState>>,
-    id: String,
-) -> Result<(), String> {
+pub async fn restart_container(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
     state
         .restart_container(&id)
         .await
@@ -315,18 +306,12 @@ pub async fn close_project(
 }
 
 #[tauri::command]
-pub async fn start_project(
-    state: State<'_, Arc<AppState>>,
-    id: String,
-) -> Result<(), String> {
+pub async fn start_project(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
     state.start_project(&id).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn stop_project(
-    state: State<'_, Arc<AppState>>,
-    id: String,
-) -> Result<(), String> {
+pub async fn stop_project(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
     state.stop_project(&id).await.map_err(|e| e.to_string())
 }
 
@@ -442,4 +427,102 @@ pub async fn reset_settings(state: State<'_, Arc<AppState>>) -> Result<Settings,
         .await
         .map_err(|e| e.to_string())?;
     Ok(defaults)
+}
+
+// === Update Commands ===
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateInfo {
+    pub version: String,
+    pub current_version: String,
+    pub body: Option<String>,
+    pub date: Option<String>,
+    pub available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateProgress {
+    pub downloaded: u64,
+    pub total: Option<u64>,
+    pub percent: f64,
+    pub status: String,
+}
+
+/// Check for available updates
+#[tauri::command]
+pub async fn check_for_updates(app: tauri::AppHandle) -> Result<UpdateInfo, String> {
+    use tauri_plugin_updater::UpdaterExt;
+
+    let current = env!("CARGO_PKG_VERSION").to_string();
+
+    let updater = app.updater_builder().build().map_err(|e| e.to_string())?;
+
+    match updater.check().await {
+        Ok(Some(update)) => Ok(UpdateInfo {
+            version: update.version.clone(),
+            current_version: current,
+            body: update.body.clone(),
+            date: update.date.map(|d| d.to_string()),
+            available: true,
+        }),
+        Ok(None) => Ok(UpdateInfo {
+            version: current.clone(),
+            current_version: current,
+            body: None,
+            date: None,
+            available: false,
+        }),
+        Err(e) => Err(format!("Failed to check for updates: {}", e)),
+    }
+}
+
+/// Download and install update
+#[tauri::command]
+pub async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+
+    let updater = app.updater_builder().build().map_err(|e| e.to_string())?;
+
+    match updater.check().await {
+        Ok(Some(update)) => {
+            // Download the update
+            let mut downloaded = 0;
+
+            update
+                .download_and_install(
+                    |chunk_length, content_length| {
+                        downloaded += chunk_length;
+                        log::info!("Downloaded {} of {:?} bytes", downloaded, content_length);
+                    },
+                    || {
+                        log::info!("Download finished, installing...");
+                    },
+                )
+                .await
+                .map_err(|e| format!("Update installation failed: {}", e))?;
+
+            Ok(())
+        }
+        Ok(None) => Err("No update available".to_string()),
+        Err(e) => Err(format!("Failed to check for updates: {}", e)),
+    }
+}
+
+/// Get current app version info
+#[tauri::command]
+pub async fn get_app_version() -> Result<AppVersion, String> {
+    Ok(AppVersion {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        name: env!("CARGO_PKG_NAME").to_string(),
+        authors: env!("CARGO_PKG_AUTHORS").to_string(),
+        description: env!("CARGO_PKG_DESCRIPTION").to_string(),
+    })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppVersion {
+    pub version: String,
+    pub name: String,
+    pub authors: String,
+    pub description: String,
 }

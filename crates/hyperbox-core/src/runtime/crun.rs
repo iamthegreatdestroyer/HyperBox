@@ -10,9 +10,22 @@ use async_trait::async_trait;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, BufReader};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::process::Command;
 use tracing::{debug, error, info, instrument, warn};
+
+/// Internal cgroup statistics for crun containers.
+#[derive(Debug, Default)]
+struct CrunCgroupStats {
+    /// Memory usage in bytes.
+    memory_usage: u64,
+    /// Memory limit in bytes.
+    memory_limit: u64,
+    /// CPU usage in microseconds.
+    cpu_usage_usec: u64,
+    /// Current PIDs count.
+    pids_current: u64,
+}
 
 /// crun runtime implementation.
 ///
@@ -32,10 +45,7 @@ impl CrunRuntime {
     pub async fn new(config: RuntimeConfig) -> Result<Self> {
         let binary_path = Self::find_binary(&config)?;
 
-        info!(
-            "Initializing crun runtime at {:?}",
-            binary_path
-        );
+        info!("Initializing crun runtime at {:?}", binary_path);
 
         Ok(Self {
             config,
@@ -59,14 +69,9 @@ impl CrunRuntime {
         }
 
         // Try PATH lookup
-        if let Ok(output) = std::process::Command::new("which")
-            .arg("crun")
-            .output()
-        {
+        if let Ok(output) = std::process::Command::new("which").arg("crun").output() {
             if output.status.success() {
-                let path = String::from_utf8_lossy(&output.stdout)
-                    .trim()
-                    .to_string();
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 return Ok(PathBuf::from(path));
             }
         }
@@ -93,16 +98,14 @@ impl CrunRuntime {
 
         debug!("Running crun: {:?}", cmd);
 
-        let output = tokio::time::timeout(
-            Duration::from_secs(self.config.timeout_seconds),
-            cmd.output(),
-        )
-        .await
-        .map_err(|_| CoreError::Timeout {
-            operation: "crun command".to_string(),
-            duration_ms: self.config.timeout_seconds * 1000,
-        })?
-        .map_err(|e| CoreError::RuntimeExecution(e.to_string()))?;
+        let output =
+            tokio::time::timeout(Duration::from_secs(self.config.timeout_seconds), cmd.output())
+                .await
+                .map_err(|_| CoreError::Timeout {
+                    operation: "crun command".to_string(),
+                    duration_ms: self.config.timeout_seconds * 1000,
+                })?
+                .map_err(|e| CoreError::RuntimeExecution(e.to_string()))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -198,6 +201,61 @@ impl CrunRuntime {
 
         oci_resources
     }
+
+    /// Read cgroup v2 statistics for a container.
+    async fn read_cgroup_stats(&self, id: &ContainerId) -> Result<CrunCgroupStats> {
+        // Try multiple possible cgroup paths
+        let possible_paths = [
+            PathBuf::from("/sys/fs/cgroup/hyperbox.slice")
+                .join(format!("container-{}", id.as_str())),
+            PathBuf::from("/sys/fs/cgroup/system.slice")
+                .join(format!("crun-{}.scope", id.as_str())),
+            PathBuf::from("/sys/fs/cgroup").join(id.as_str()),
+        ];
+
+        for cgroup_path in &possible_paths {
+            if cgroup_path.exists() {
+                return self.read_stats_from_path(cgroup_path).await;
+            }
+        }
+
+        // Return empty stats if cgroup not found
+        Ok(CrunCgroupStats::default())
+    }
+
+    /// Read stats from a specific cgroup path.
+    async fn read_stats_from_path(&self, path: &Path) -> Result<CrunCgroupStats> {
+        use tokio::fs;
+        let mut stats = CrunCgroupStats::default();
+
+        // Read memory.current
+        if let Ok(content) = fs::read_to_string(path.join("memory.current")).await {
+            stats.memory_usage = content.trim().parse().unwrap_or(0);
+        }
+
+        // Read memory.max
+        if let Ok(content) = fs::read_to_string(path.join("memory.max")).await {
+            stats.memory_limit = content.trim().parse().unwrap_or(u64::MAX);
+        }
+
+        // Read cpu.stat
+        if let Ok(content) = fs::read_to_string(path.join("cpu.stat")).await {
+            for line in content.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 && parts[0] == "usage_usec" {
+                    stats.cpu_usage_usec = parts[1].parse().unwrap_or(0);
+                    break;
+                }
+            }
+        }
+
+        // Read pids.current
+        if let Ok(content) = fs::read_to_string(path.join("pids.current")).await {
+            stats.pids_current = content.trim().parse().unwrap_or(0);
+        }
+
+        Ok(stats)
+    }
 }
 
 #[async_trait]
@@ -223,13 +281,8 @@ impl ContainerRuntime for CrunRuntime {
 
         let bundle = self.generate_bundle(&spec).await?;
 
-        self.run_crun(&[
-            "create",
-            "--bundle",
-            bundle.to_str().unwrap(),
-            id.as_str(),
-        ])
-        .await?;
+        self.run_crun(&["create", "--bundle", bundle.to_str().unwrap(), id.as_str()])
+            .await?;
 
         info!(container_id = %id, "Container created");
         Ok(id)
@@ -327,9 +380,7 @@ impl ContainerRuntime for CrunRuntime {
         let output = self.run_crun(&["state", id.as_str()]).await?;
         let state_json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
 
-        let status = state_json["status"]
-            .as_str()
-            .unwrap_or("unknown");
+        let status = state_json["status"].as_str().unwrap_or("unknown");
 
         Ok(match status {
             "creating" => ContainerState::Creating,
@@ -343,22 +394,38 @@ impl ContainerRuntime for CrunRuntime {
 
     async fn stats(&self, id: &ContainerId) -> Result<ContainerStats> {
         // Read from cgroup v2 statistics
-        // This is a simplified implementation
+        // crun creates cgroups at /sys/fs/cgroup/hyperbox.slice/container-{id}
+        // or uses the system.slice/crun-{id}.scope pattern
+        let cgroup_stats = self.read_cgroup_stats(id).await;
+
+        let (memory_usage, memory_limit, cpu_usage_usec, pids) = match cgroup_stats {
+            Ok(stats) => {
+                (stats.memory_usage, stats.memory_limit, stats.cpu_usage_usec, stats.pids_current)
+            }
+            Err(_) => (0, 0, 0, 0),
+        };
+
+        let memory_percent = if memory_limit > 0 {
+            (memory_usage as f64 / memory_limit as f64) * 100.0
+        } else {
+            0.0
+        };
+
         Ok(ContainerStats {
             container_id: id.clone(),
             timestamp: chrono::Utc::now(),
             cpu: CpuStats {
-                usage_percent: 0.0,
-                total_usage_ns: 0,
+                usage_percent: 0.0, // Would need delta calculation
+                total_usage_ns: cpu_usage_usec * 1000,
                 system_usage_ns: 0,
                 num_cpus: num_cpus::get() as u32,
             },
             memory: MemoryStats {
-                used_bytes: 0,
-                available_bytes: 0,
-                limit_bytes: 0,
+                used_bytes: memory_usage,
+                available_bytes: memory_limit.saturating_sub(memory_usage),
+                limit_bytes: memory_limit,
                 cache_bytes: 0,
-                usage_percent: 0.0,
+                usage_percent: memory_percent,
             },
             network: NetworkStats {
                 rx_bytes: 0,
@@ -374,7 +441,7 @@ impl ContainerRuntime for CrunRuntime {
                 read_ops: 0,
                 write_ops: 0,
             },
-            pids: 0,
+            pids,
         })
     }
 
@@ -443,11 +510,8 @@ impl ContainerRuntime for CrunRuntime {
     async fn checkpoint(&self, id: &ContainerId, checkpoint_path: &Path) -> Result<CheckpointId> {
         tokio::fs::create_dir_all(checkpoint_path).await?;
 
-        let checkpoint_id = CheckpointId::new(format!(
-            "{}-{}",
-            id.short(),
-            chrono::Utc::now().timestamp()
-        ));
+        let checkpoint_id =
+            CheckpointId::new(format!("{}-{}", id.short(), chrono::Utc::now().timestamp()));
 
         self.run_crun(&[
             "checkpoint",
@@ -508,6 +572,31 @@ impl ContainerRuntime for CrunRuntime {
     async fn top(&self, id: &ContainerId) -> Result<Vec<ProcessInfo>> {
         // Would read from /proc filesystem for container PID namespace
         Ok(Vec::new())
+    }
+
+    async fn pull_image(&self, _image: &crate::types::ImageRef) -> Result<()> {
+        // crun doesn't handle image pulling directly - it works with OCI bundles
+        // Image pulling would be delegated to a registry client like skopeo or
+        // our built-in ImageRegistry. For now, we return an error indicating
+        // this should be handled at a higher level.
+        Err(CoreError::Runtime(
+            "crun does not handle image pulling. Use ImageRegistry or Docker/Podman to pull images.".to_string()
+        ))
+    }
+
+    async fn image_exists(&self, _image: &str) -> Result<bool> {
+        // crun works with OCI bundles, not images directly
+        // Image management should be done at a higher level
+        Err(CoreError::Runtime(
+            "crun does not manage images. Use ImageRegistry for image operations.".to_string(),
+        ))
+    }
+
+    async fn list_images(&self) -> Result<Vec<super::traits::ImageInfo>> {
+        // crun works with OCI bundles, not images directly
+        Err(CoreError::Runtime(
+            "crun does not manage images. Use ImageRegistry for image operations.".to_string(),
+        ))
     }
 }
 

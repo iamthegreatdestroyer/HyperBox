@@ -1,17 +1,10 @@
 import { useState } from "react";
-import {
-  Settings as SettingsIcon,
-  Moon,
-  Sun,
-  Monitor,
-  Folder,
-  RefreshCw,
-  Trash2,
-} from "lucide-react";
+import { Moon, Sun, Monitor, Folder, RefreshCw, Trash2 } from "lucide-react";
 import { useSystemStore } from "../stores/system";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { clsx } from "clsx";
+import { UpdateSettings as UpdateSettingsComponent } from "../components/UpdateChecker";
 
 export default function Settings() {
   const { theme, setTheme, startDaemon, stopDaemon, daemonConnected, loading } = useSystemStore();
@@ -297,6 +290,9 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      {/* Updates */}
+      <UpdateSettingsComponent />
     </div>
   );
 }

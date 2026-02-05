@@ -2,7 +2,6 @@
 
 use crate::error::{CoreError, Result};
 use dashmap::DashSet;
-use std::collections::HashMap;
 use std::net::{SocketAddr, TcpListener};
 use std::sync::atomic::{AtomicU16, Ordering};
 use tracing::debug;
