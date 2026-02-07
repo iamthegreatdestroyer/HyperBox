@@ -224,7 +224,7 @@ fn bench_prediction_model(c: &mut Criterion) {
             let mut model = Vec::new();
 
             for (path, count) in patterns {
-                let probability = (*count as f64 / total_accesses as f64) * 100.0;
+                let probability = (count as f64 / total_accesses as f64) * 100.0;
                 model.push((path, probability));
             }
 

@@ -12,6 +12,7 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY app ./app
+COPY tests ./tests
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \

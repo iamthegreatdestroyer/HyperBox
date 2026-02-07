@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+use crate::error::CoreError;
 
 /// Types of Linux namespaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

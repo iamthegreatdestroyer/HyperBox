@@ -1,0 +1,676 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   S:\HyperBox\app\src-tauri\Cargo.toml
+workspace: S:\HyperBox\Cargo.toml
+   Compiling tauri v2.9.5
+   Compiling windows v0.61.3
+   Compiling moxcms v0.7.11
+   Compiling tauri-utils v2.8.1
+   Compiling tauri-macros v2.5.2
+   Compiling tauri-plugin-fs v2.4.5
+warning: unused imports: `debug` and `info`
+ --> crates\hyperbox-core\src\network\bridge.rs:6:15
+  |
+6 | use tracing::{debug, info};
+  |               ^^^^^  ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `info`
+ --> crates\hyperbox-core\src\network\cni.rs:7:22
+  |
+7 | use tracing::{debug, info};
+  |                      ^^^^
+
+warning: unused variable: `io_max`
+   --> crates\hyperbox-core\src\isolation\cgroups.rs:171:17
+    |
+171 |             let io_max = cgroup_path.join("io.max");
+    |                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_io_max`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `pid`
+   --> crates\hyperbox-core\src\isolation\cgroups.rs:246:27
+    |
+246 |                 if let Ok(pid) = line.trim().parse::<i32>() {
+    |                           ^^^ help: if this is intentional, prefix it with an underscore: `_pid`
+
+warning: unused variable: `id`
+   --> crates\hyperbox-core\src\runtime\crun.rs:572:25
+    |
+572 |     async fn top(&self, id: &ContainerId) -> Result<Vec<ProcessInfo>> {
+    |                         ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: field `config` is never read
+  --> crates\hyperbox-core\src\isolation\namespaces.rs:94:5
+   |
+93 | pub struct NamespaceManager {
+   |            ---------------- field in this struct
+94 |     config: NamespaceConfig,
+   |     ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: field `subnet` is never read
+  --> crates\hyperbox-core\src\network\bridge.rs:18:5
+   |
+16 | pub struct BridgeNetwork {
+   |            ------------- field in this struct
+17 |     name: String,
+18 |     subnet: String,
+   |     ^^^^^^
+
+warning: field `stop_timeout` is never read
+  --> crates\hyperbox-core\src\runtime\docker.rs:61:5
+   |
+55 | pub struct DockerRuntime {
+   |            ------------- field in this struct
+...
+61 |     stop_timeout: i64,
+   |     ^^^^^^^^^^^^
+
+warning: trait `ContainerRuntimeExt` is never used
+   --> crates\hyperbox-core\src\runtime\traits.rs:285:11
+    |
+285 | pub trait ContainerRuntimeExt: ContainerRuntime {
+    |           ^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:34:27
+   |
+34 |     RuntimeNotAvailable { runtime: String, path: PathBuf },
+   |                           ^^^^^^^^^^^^^^^
+   |
+note: the lint level is defined here
+  --> crates\hyperbox-core\src\lib.rs:30:9
+   |
+30 | #![warn(missing_docs)]
+   |         ^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:34:44
+   |
+34 |     RuntimeNotAvailable { runtime: String, path: PathBuf },
+   |                                            ^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:50:23
+   |
+50 |     CgroupOperation { operation: String, reason: String },
+   |                       ^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:50:42
+   |
+50 |     CgroupOperation { operation: String, reason: String },
+   |                                          ^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:55:9
+   |
+55 |         namespace_type: String,
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:56:9
+   |
+56 |         reason: String,
+   |         ^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:69:28
+   |
+69 |     PortAllocationFailed { port: u16 },
+   |                            ^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:81:24
+   |
+81 |     PermissionDenied { operation: String, required: String },
+   |                        ^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:81:43
+   |
+81 |     PermissionDenied { operation: String, required: String },
+   |                                           ^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:86:9
+   |
+86 |         resource: String,
+   |         ^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:87:9
+   |
+87 |         limit: String,
+   |         ^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:88:9
+   |
+88 |         requested: String,
+   |         ^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:93:15
+   |
+93 |     Timeout { operation: String, duration_ms: u64 },
+   |               ^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:93:34
+   |
+93 |     Timeout { operation: String, duration_ms: u64 },
+   |                                  ^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:97:19
+   |
+97 |     InvalidSpec { field: String, reason: String },
+   |                   ^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:97:34
+   |
+97 |     InvalidSpec { field: String, reason: String },
+   |                                  ^^^^^^^^^^^^^^
+
+warning: missing documentation for a constant
+  --> crates\hyperbox-core\src\network\cni.rs:11:1
+   |
+11 | pub const CNI_CONF_DIR: &str = "/etc/cni/net.d";
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `hyperbox-core` (lib) generated 26 warnings (run `cargo fix --lib -p hyperbox-core` to apply 2 suggestions)
+   Compiling rustls v0.23.36
+   Compiling toml_edit v0.20.2
+   Compiling tauri-plugin-window-state v2.4.1
+   Compiling tauri-plugin-notification v2.3.3
+   Compiling tauri-plugin-shell v2.3.4
+   Compiling tauri-plugin-clipboard-manager v2.3.2
+   Compiling tauri-plugin-updater v2.9.0
+   Compiling tauri-plugin-process v2.3.1
+   Compiling tauri-plugin-dialog v2.6.0
+   Compiling tauri-plugin-os v2.3.2
+   Compiling tauri-plugin-log v2.8.0
+   Compiling toml v0.8.2
+   Compiling hyperbox-desktop v0.1.0 (S:\HyperBox\app\src-tauri)
+   Compiling tracing-subscriber v0.3.22
+warning: unused variable: `layer_digest`
+   --> crates\hyperbox-optimize\src\lazy_load.rs:324:33
+    |
+324 |     async fn fetch_chunk(&self, layer_digest: &str, entry: &TocEntry) -> Result<Vec<u8>> {
+    |                                 ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_layer_digest`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `container`
+   --> crates\hyperbox-optimize\src\prewarm.rs:189:37
+    |
+189 |                     if let Some((_, container)) = prewarmed.remove(&id) {
+    |                                     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_container`
+
+warning: unused variable: `end`
+   --> crates\hyperbox-optimize\src\predict.rs:364:13
+    |
+364 |         let end = now + Duration::minutes(window_minutes as i64);
+    |             ^^^ help: if this is intentional, prefix it with an underscore: `_end`
+
+warning: fields `is_weekend` and `minutes` are never read
+  --> crates\hyperbox-optimize\src\predict.rs:45:5
+   |
+39 | struct TimeFeatures {
+   |        ------------ fields in this struct
+...
+45 |     is_weekend: bool,
+   |     ^^^^^^^^^^
+46 |     /// Minutes since midnight.
+47 |     minutes: u16,
+   |     ^^^^^^^
+   |
+   = note: `TimeFeatures` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` on by default
+
+   Compiling hyperbox-core v0.1.0 (S:\HyperBox\crates\hyperbox-core)
+warning: `hyperbox-optimize` (lib) generated 4 warnings
+   Compiling hyperbox-optimize v0.1.0 (S:\HyperBox\crates\hyperbox-optimize)
+   Compiling hyperbox-project v0.1.0 (S:\HyperBox\crates\hyperbox-project)
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper-rustls v0.27.7
+   Compiling image v0.25.9
+warning: field `version` is never read
+   --> crates\hyperbox-project\src\detection.rs:560:5
+    |
+557 | struct ComposeFile {
+    |        ----------- field in this struct
+...
+560 |     version: Option<String>,
+    |     ^^^^^^^
+    |
+    = note: `ComposeFile` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` on by default
+
+warning: fields `entrypoint`, `restart`, `container_name`, `working_dir`, `user`, and `labels` are never read
+   --> crates\hyperbox-project\src\detection.rs:581:5
+    |
+573 | struct ComposeService {
+    |        -------------- fields in this struct
+...
+581 |     entrypoint: Option<StringOrList>,
+    |     ^^^^^^^^^^
+...
+595 |     restart: Option<String>,
+    |     ^^^^^^^
+596 |     /// Container name
+597 |     container_name: Option<String>,
+    |     ^^^^^^^^^^^^^^
+598 |     /// Working directory
+599 |     working_dir: Option<String>,
+    |     ^^^^^^^^^^^
+600 |     /// User
+601 |     user: Option<String>,
+    |     ^^^^
+602 |     /// Labels
+603 |     labels: Option<std::collections::HashMap<String, String>>,
+    |     ^^^^^^
+    |
+    = note: `ComposeService` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `args` and `target` are never read
+   --> crates\hyperbox-project\src\detection.rs:624:5
+    |
+618 | struct BuildExtended {
+    |        ------------- fields in this struct
+...
+624 |     args: Option<std::collections::HashMap<String, String>>,
+    |     ^^^^
+625 |     /// Target stage
+626 |     target: Option<String>,
+    |     ^^^^^^
+    |
+    = note: `BuildExtended` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `replicas` is never read
+   --> crates\hyperbox-project\src\detection.rs:689:5
+    |
+685 | struct ComposeDeploy {
+    |        ------------- field in this struct
+...
+689 |     replicas: Option<u32>,
+    |     ^^^^^^^^
+    |
+    = note: `ComposeDeploy` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `driver` and `driver_opts` are never read
+   --> crates\hyperbox-project\src\detection.rs:714:5
+    |
+712 | struct ComposeVolume {
+    |        ------------- fields in this struct
+713 |     /// Volume driver
+714 |     driver: Option<String>,
+    |     ^^^^^^
+715 |     /// Driver options
+716 |     driver_opts: Option<std::collections::HashMap<String, String>>,
+    |     ^^^^^^^^^^^
+    |
+    = note: `ComposeVolume` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `driver` and `external` are never read
+   --> crates\hyperbox-project\src\detection.rs:723:5
+    |
+721 | struct ComposeNetwork {
+    |        -------------- fields in this struct
+722 |     /// Network driver
+723 |     driver: Option<String>,
+    |     ^^^^^^
+724 |     /// External network
+725 |     external: Option<bool>,
+    |     ^^^^^^^^
+    |
+    = note: `ComposeNetwork` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+   Compiling reqwest v0.12.28
+warning: variable does not need to be mutable
+    --> crates\hyperbox-optimize\src\dedup.rs:1494:13
+     |
+1494 |         let mut data_a = vec![0u8; 100_000];
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` on by default
+
+warning: unused variable: `i`
+    --> crates\hyperbox-optimize\src\memory.rs:1098:13
+     |
+1098 |         for i in 0..MAX_HISTORY_SAMPLES + 100 {
+     |             ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `day`
+   --> crates\hyperbox-optimize\src\predict.rs:466:43
+    |
+466 |     fn make_event(image: &str, hour: u32, day: Weekday) -> UsageEvent {
+    |                                           ^^^ help: if this is intentional, prefix it with an underscore: `_day`
+
+warning: unused variable: `rate`
+   --> crates\hyperbox-optimize\src\prewarm.rs:556:26
+    |
+556 |         let (_, hits, _, rate) = manager.stats();
+    |                          ^^^^ help: if this is intentional, prefix it with an underscore: `_rate`
+
+warning: function `make_event` is never used
+   --> crates\hyperbox-optimize\src\predict.rs:466:8
+    |
+466 |     fn make_event(image: &str, hour: u32, day: Weekday) -> UsageEvent {
+    |        ^^^^^^^^^^
+
+   Compiling arboard v3.6.1
+warning: `hyperbox-project` (lib) generated 6 warnings
+   Compiling webview2-com-sys v0.38.2
+   Compiling tao v0.34.5
+   Compiling tauri-winrt-notification v0.7.2
+   Compiling notify-rust v4.11.7
+   Compiling webview2-com v0.38.2
+   Compiling wry v0.53.5
+   Compiling tauri-runtime v2.9.2
+   Compiling tauri-runtime-wry v2.9.3
+warning: `hyperbox-core` (lib test) generated 26 warnings (26 duplicates)
+warning: `hyperbox-project` (lib test) generated 6 warnings (6 duplicates)
+warning: `hyperbox-optimize` (lib test) generated 9 warnings (4 duplicates) (run `cargo fix --lib -p hyperbox-optimize --tests` to apply 1 suggestion)
+   Compiling tauri-plugin-single-instance v2.3.7
+    Finished `test` profile [optimized + debuginfo] target(s) in 6m 21s
+     Running unittests src\lib.rs (target\debug\deps\hyperbox_core-0d60c67ddf31fdb0.exe)
+
+running 102 tests
+test isolation::cgroups::tests::test_cgroup_manager_creation ... ok
+test isolation::cgroups::tests::test_cgroup_manager_custom_path ... ok
+test isolation::landlock::tests::test_access_fs_for_abi ... ok
+test isolation::landlock::tests::test_access_fs_bitor ... ok
+test isolation::landlock::tests::test_abi_from_version ... ok
+test isolation::landlock::tests::test_access_fs_compound_read_write ... ok
+test isolation::landlock::tests::test_abi_min_kernel ... ok
+test isolation::landlock::tests::test_access_fs_empty ... ok
+test isolation::landlock::tests::test_abi_ordering ... ok
+test isolation::cgroups::tests::test_cgroup_stats_default ... ok
+test isolation::landlock::tests::test_abi_serialization ... ok
+test isolation::landlock::tests::test_abi_feature_support ... ok
+test isolation::landlock::tests::test_access_fs_bitand ... ok
+test isolation::landlock::tests::test_access_fs_compound_read_only ... ok
+test isolation::landlock::tests::test_access_fs_bitor_assign ... ok
+test isolation::landlock::tests::test_access_fs_from_bits_roundtrip ... ok
+test isolation::landlock::tests::test_access_fs_full_contains_all_individual ... ok
+test isolation::landlock::tests::test_access_fs_individual_flags ... ok
+test isolation::landlock::tests::test_abi_display ... ok
+test isolation::landlock::tests::test_access_net_flags ... ok
+test isolation::landlock::tests::test_access_net_bitor ... ok
+test isolation::landlock::tests::test_builder_allow_port ... ok
+test isolation::landlock::tests::test_access_fs_serialization ... ok
+test isolation::landlock::tests::test_builder_empty ... ok
+test isolation::landlock::tests::test_builder_fs_only ... ok
+test isolation::landlock::tests::test_builder_with_network ... ok
+test isolation::landlock::tests::test_config_json_empty_ruleset ... ok
+test isolation::landlock::tests::test_config_json_structure ... ok
+test isolation::landlock::tests::test_container_ruleset_with_mounts ... ok
+test isolation::landlock::tests::test_enforce_fails_on_non_linux ... ok
+test isolation::landlock::tests::test_manager_creation ... ok
+test isolation::landlock::tests::test_permissive_policy ... ok
+test isolation::landlock::tests::test_manager_default ... ok
+test isolation::landlock::tests::test_ruleset_serialization_roundtrip ... ok
+test isolation::landlock::tests::test_standard_policy ... ok
+test isolation::landlock::tests::test_strict_policy ... ok
+test isolation::security_stack::tests::audit_full_availability ... ok
+test isolation::security_stack::tests::audit_partial_availability ... ok
+test isolation::security_stack::tests::audit_score_below_threshold ... ok
+test isolation::security_stack::tests::builder_hardened_disables_vm ... ok
+test isolation::security_stack::tests::builder_minimal_then_customise ... ok
+test isolation::security_stack::tests::cgroup_policy_default_enabled ... ok
+test isolation::security_stack::tests::enabled_layer_count ... ok
+test isolation::security_stack::tests::hardened_policy ... ok
+test isolation::security_stack::tests::landlock_policy_default ... ok
+test isolation::security_stack::tests::layer_kind_display ... ok
+test isolation::security_stack::tests::layer_kind_ord ... ok
+test isolation::security_stack::tests::layer_outcome_checks ... ok
+test isolation::security_stack::tests::layer_status_ok ... ok
+test isolation::security_stack::tests::layer_status_unavailable ... ok
+test isolation::security_stack::tests::layer_status_with_level ... ok
+test isolation::security_stack::tests::namespace_policy_default_enables_all ... ok
+test isolation::security_stack::tests::minimal_policy ... ok
+test isolation::security_stack::tests::namespace_policy_minimal ... ok
+test isolation::security_stack::tests::report_is_usable_no_failures ... ok
+test isolation::security_stack::tests::report_summary_format ... ok
+test isolation::security_stack::tests::report_tracking ... ok
+test isolation::security_stack::tests::seccomp_policy_default ... ok
+test isolation::security_stack::tests::stack_display_format ... ok
+test isolation::security_stack::tests::standard_policy ... ok
+test runtime::crun::tests::test_container_id_generation ... ok
+test runtime::crun::tests::test_image_ref_parsing ... ok
+test runtime::docker::tests::test_state_conversion ... ok
+test runtime::registry::tests::test_default_registry ... ok
+test storage::composefs::tests::test_composefs_stats_roundtrip ... ok
+test storage::composefs::tests::test_compute_digest_deterministic ... ok
+test storage::composefs::tests::test_compute_digest_empty ... ok
+test storage::composefs::tests::test_compute_digest_format ... ok
+test storage::composefs::tests::test_compute_digest_unique ... ok
+test storage::composefs::tests::test_dedup_ratio ... ok
+test storage::composefs::tests::test_dedup_ratio_zero_bytes ... ok
+test network::ports::tests::test_preferred_port ... ok
+test network::ports::tests::test_port_allocator ... ok
+test runtime::registry::tests::test_registry_creation ... ok
+test storage::composefs::tests::test_format_bytes ... ok
+test storage::composefs::tests::test_gc_result_serialize ... ok
+test storage::composefs::tests::test_manager_new ... ok
+test storage::composefs::tests::test_object_path_short_hash ... ok
+test storage::composefs::tests::test_object_path_two_level ... ok
+test storage::composefs::tests::test_object_path_strips_prefix ... ok
+test storage::composefs::tests::test_initialize_creates_dirs ... ok
+test storage::composefs::tests::test_gc_empty_store ... ok
+test storage::composefs::tests::test_initialize_idempotent ... ok
+test storage::composefs::tests::test_verify_result_corrupted ... ok
+test storage::composefs::tests::test_verify_result_healthy ... ok
+test storage::composefs::tests::test_stats_empty ... ok
+test storage::composefs::tests::test_deduplicate_empty_dir ... ok
+test storage::composefs::tests::test_object_size ... ok
+test storage::composefs::tests::test_gc_bare_digest_format ... ok
+test storage::composefs::tests::test_remove_object ... ok
+test storage::composefs::tests::test_has_object ... ok
+test storage::composefs::tests::test_verify_store_empty ... ok
+test storage::composefs::tests::test_store_and_get ... ok
+test storage::composefs::tests::test_store_deduplication ... ok
+test storage::composefs::tests::test_gc_keeps_all_referenced ... ok
+test storage::composefs::tests::test_verify_object_intact ... ok
+test storage::composefs::tests::test_stats_with_objects ... ok
+test storage::composefs::tests::test_gc_removes_unreferenced ... ok
+test storage::composefs::tests::test_deduplicate_all_unique ... ok
+test storage::composefs::tests::test_deduplicate_directory ... ok
+test storage::composefs::tests::test_verify_store_healthy ... ok
+test storage::composefs::tests::test_store_multiple_unique ... ok
+
+test result: ok. 102 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src\lib.rs (target\debug\deps\hyperbox_desktop-8abdd8622eb52ea3.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\hyperbox_optimize-ae439a3c609e6e3d.exe)
+
+running 158 tests
+test criu::tests::test_lazy_pages_config_creation ... ok
+test criu::tests::test_checkpoint_metadata_serialization ... ok
+test criu::tests::test_checkpoint_age_validation ... ok
+test criu::tests::test_criu_options_default ... ok
+test criu::tests::test_checkpoint_incremental_without_criu_fails ... ok
+test criu::tests::test_criu_manager_creation ... ok
+test criu::tests::test_get_pre_dump_chain_empty ... ok
+test criu::tests::test_pre_dump_chain_serialization ... ok
+test criu::tests::test_page_server_config_creation ... ok
+test criu::tests::test_checkpoint_without_criu_fails ... ok
+test criu::tests::test_pre_dump_entry_serialization ... ok
+test criu::tests::test_cleanup_demand_paged_empty ... ok
+test criu::tests::test_directory_size_with_files ... ok
+test criu::tests::test_directory_size_empty ... ok
+test criu::tests::test_restore_lazy_without_criu_fails ... ok
+test criu::tests::test_restore_mode_variants ... ok
+test criu::tests::test_pre_dump_without_criu_fails ... ok
+test dedup::tests::test_bloom_filter_clear ... ok
+test dedup::tests::test_chunk_config_validation ... ok
+test dedup::tests::test_bloom_filter_no_false_negatives ... ok
+test criu::tests::test_restore_without_criu_fails ... ok
+test criu::tests::test_stop_lazy_pages_noop ... ok
+test dedup::tests::test_bloom_filter_basic ... ok
+test criu::tests::test_stop_page_server_noop ... ok
+test criu::tests::test_restore_stats_serialization ... ok
+test criu::tests::test_start_page_server_without_criu_fails ... ok
+test dedup::tests::test_bloom_filter_memory_size ... ok
+test dedup::tests::test_compression_roundtrip_none ... ok
+test dedup::tests::test_chunk_store_basic ... ok
+test dedup::tests::test_chunk_store_duplicate ... ok
+test dedup::tests::test_chunk_store_get_missing ... ok
+test dedup::tests::test_chunk_store_lz4_compression ... ok
+test dedup::tests::test_bloom_filter_fpr_reasonable ... ok
+test dedup::tests::test_dedup_manager_evict ... ok
+test dedup::tests::test_deduplicator_bloom_memory ... ok
+test dedup::tests::test_chunk_store_zstd_compression ... ok
+test dedup::tests::test_dedup_manager_basic ... ok
+test dedup::tests::test_dedup_manager_diff ... ok
+test dedup::tests::test_compression_roundtrip_lz4 ... ok
+test dedup::tests::test_deduplicator_detects_duplicates ... FAILED
+test dedup::tests::test_compression_roundtrip_zstd ... ok
+test dedup::tests::test_deduplicator_partial_overlap ... ok
+test dedup::tests::test_fastcdc_content_sensitivity ... ok
+test dedup::tests::test_deduplicator_process_layer ... ok
+test dedup::tests::test_deduplicator_stats ... ok
+test dedup::tests::test_fastcdc_basic_chunking ... ok
+test dedup::tests::test_fastcdc_deterministic ... ok
+test criu::tests::test_delete_checkpoint_nonexistent ... ok
+test criu::tests::test_list_checkpoints_empty ... ok
+test criu::tests::test_criu_manager_initialize ... ok
+test dedup::tests::test_fastcdc_chunk_size_bounds ... ok
+test dedup::tests::test_fastcdc_empty_data ... ok
+test dedup::tests::test_fastcdc_small_data ... ok
+test dedup::tests::test_merkle_diff_structural_change ... ok
+test dedup::tests::test_merkle_tree_build ... ok
+test dedup::tests::test_gear_table_nonzero ... ok
+test dedup::tests::test_gear_table_unique ... ok
+test dedup::tests::test_merkle_tree_empty ... ok
+test dedup::tests::test_merkle_tree_root_deterministic ... ok
+test dedup::tests::test_hash_hex_format ... ok
+test dedup::tests::test_merkle_diff_all_different ... ok
+test dedup::tests::test_sha256_hash_deterministic ... ok
+test dedup::tests::test_merkle_diff_identical ... ok
+test dedup::tests::test_merkle_diff_single_change ... ok
+test dedup::tests::test_merkle_tree_single_leaf ... ok
+test criu::tests::test_get_checkpoint_not_found ... ok
+test dedup::tests::test_sha256_hash_different_inputs ... ok
+test lazy_load::tests::test_cache_hit_rate_zero_when_no_accesses ... ok
+test lazy_load::tests::test_lazy_layer_loader_creation ... ok
+test lazy_load::tests::test_layer_state_creation ... ok
+test memory::tests::balloon_reason_display ... ok
+test memory::tests::compute_adjustment_idle_reclaim ... ok
+test lazy_load::tests::test_layer_not_found ... ok
+test memory::tests::default_config_sane ... ok
+test lazy_load::tests::test_parse_toc_with_valid_json ... ok
+test lazy_load::tests::test_parse_toc_empty ... ok
+test memory::tests::config_watermark_ordering ... ok
+test memory::tests::compute_adjustment_no_limit ... ok
+test memory::tests::free_page_report_fields ... ok
+test memory::tests::ksm_status_defaults ... ok
+test memory::tests::history_compaction ... ok
+test lazy_load::tests::test_toc_serialization ... ok
+test memory::tests::container_state_idle_detection ... ok
+test lazy_load::tests::test_toc_entry_types ... ok
+test memory::tests::sample_usage_ratio ... ok
+test lazy_load::tests::test_get_progress_layer_not_found ... ok
+test criu::tests::test_find_criu_returns_option ... ok
+test lazy_load::tests::test_toc_entry_serialization ... ok
+test lazy_load::tests::test_stats_initial_values ... ok
+test lazy_load::tests::test_get_prefetch_list_layer_not_found ... ok
+test memory::tests::container_state_ema_updates ... ok
+test memory::tests::manual_balloon_missing_container ... ok
+test memory::tests::manual_balloon_set ... ok
+test memory::tests::reset_all_balloons ... ok
+test memory::tests::sample_reclaimable ... ok
+test memory::tests::page_size_detection ... ok
+test memory::tests::register_and_unregister ... ok
+test memory::tests::container_state_not_idle_with_changes ... ok
+test memory::tests::sample_working_set ... ok
+test lazy_load::tests::test_lazy_layer_loader_initialize ... ok
+test nydus::tests::test_cache_stats_default ... ok
+test memory::tests::total_working_set_and_reclaimable ... ok
+test memory::tests::sample_zero_limit ... ok
+test nydus::tests::test_build_daemon_config_json ... ok
+test nydus::tests::test_daemon_status_serialization ... ok
+test memory::tests::stats_snapshot_zero ... ok
+test nydus::tests::test_default_daemon_config ... ok
+test nydus::tests::test_build_daemon_config_http ... ok
+test nydus::tests::test_convert_image_without_nydus_fails ... ok
+test nydus::tests::test_nydus_fs_driver_variants ... ok
+test nydus::tests::test_nydus_cache_type_variants ... ok
+test nydus::tests::test_nydus_image_serialization ... ok
+test nydus::tests::test_gc_cache_empty ... ok
+test nydus::tests::test_sanitize_image_ref ... ok
+test nydus::tests::test_get_daemon_status_none ... ok
+test nydus::tests::test_get_image_none ... ok
+test predict::tests::test_get_predictions ... ok
+test nydus::tests::test_cache_stats_empty_dir ... ok
+test predict::tests::test_predict_no_data ... ok
+test predict::tests::test_model_stats ... ok
+test predict::tests::test_predict_window ... ok
+test nydus::tests::test_manager_creation ... ok
+test nydus::tests::test_list_daemons_empty ... ok
+test nydus::tests::test_find_binary_returns_none_for_nonexistent ... ok
+test predict::tests::test_predict_insufficient_samples ... ok
+test nydus::tests::test_prefetch_files_no_daemon ... ok
+test nydus::tests::test_validate_image_without_nydus_fails ... ok
+test predict::tests::test_predict_with_sufficient_samples ... ok
+test predict::tests::test_predictions_count_increment ... ok
+test predict::tests::test_record_event ... ok
+test nydus::tests::test_start_daemon_without_nydus_fails ... ok
+test predict::tests::test_record_multiple_events_same_image ... ok
+test nydus::tests::test_shutdown_empty ... ok
+test predict::tests::test_time_features_weekend ... ok
+test predict::tests::test_tracked_images ... ok
+test nydus::tests::test_stop_daemon_noop ... ok
+test predict::tests::test_usage_predictor_new ... ok
+test prewarm::tests::test_prewarm_config_default ... ok
+test nydus::tests::test_gc_cache_under_limit ... ok
+test predict::tests::test_initialize_creates_directory ... ok
+test predict::tests::test_train_insufficient_data ... ok
+test prewarm::tests::test_prewarmed_container_struct ... ok
+test prewarm::tests::test_prewarm_manager_new ... ok
+test prewarm::tests::test_prewarm_manager_with_config ... ok
+test prewarm::tests::test_initialize_creates_directory ... ok
+test prewarm::tests::test_average_hit_score ... ok
+test prewarm::tests::test_claim_nonexistent_image ... ok
+test prewarm::tests::test_claim_already_used ... ok
+test prewarm::tests::test_hit_rate_calculation ... ok
+test prewarm::tests::test_claim_prewarmed_container ... ok
+test predict::tests::test_train_sufficient_data ... ok
+test prewarm::tests::test_prewarm_container ... ok
+test prewarm::tests::test_prewarm_duplicate_image ... ok
+test prewarm::tests::test_get_suggestions ... ok
+test prewarm::tests::test_prewarm_max_limit ... ok
+test predict::tests::test_save_and_load ... ok
+test prewarm::tests::test_stop_clears_prewarmed ... ok
+test nydus::tests::test_manager_initialize_creates_dirs ... ok
+
+failures:
+
+---- dedup::tests::test_deduplicator_detects_duplicates stdout ----
+
+thread 'dedup::tests::test_deduplicator_detects_duplicates' panicked at crates\hyperbox-optimize\src\dedup.rs:1642:9:
+assertion `left == right` failed
+  left: 47
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    dedup::tests::test_deduplicator_detects_duplicates
+
+test result: FAILED. 157 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+error: test failed, to rerun pass `-p hyperbox-optimize --lib`

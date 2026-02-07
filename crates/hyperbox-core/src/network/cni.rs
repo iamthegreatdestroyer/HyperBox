@@ -4,7 +4,7 @@ use crate::error::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tracing::{debug, info};
+use tracing::debug;
 
 /// CNI plugin paths.
 pub const CNI_BIN_DIR: &str = "/opt/cni/bin";

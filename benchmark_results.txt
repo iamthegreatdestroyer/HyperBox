@@ -1,0 +1,539 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   S:\HyperBox\app\src-tauri\Cargo.toml
+workspace: S:\HyperBox\Cargo.toml
+warning: unused imports: `debug` and `info`
+ --> crates\hyperbox-core\src\network\bridge.rs:6:15
+  |
+6 | use tracing::{debug, info};
+  |               ^^^^^  ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `info`
+ --> crates\hyperbox-core\src\network\cni.rs:7:22
+  |
+7 | use tracing::{debug, info};
+  |                      ^^^^
+
+warning: unused variable: `io_max`
+   --> crates\hyperbox-core\src\isolation\cgroups.rs:171:17
+    |
+171 |             let io_max = cgroup_path.join("io.max");
+    |                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_io_max`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `pid`
+   --> crates\hyperbox-core\src\isolation\cgroups.rs:246:27
+    |
+246 |                 if let Ok(pid) = line.trim().parse::<i32>() {
+    |                           ^^^ help: if this is intentional, prefix it with an underscore: `_pid`
+
+warning: unused variable: `id`
+   --> crates\hyperbox-core\src\runtime\crun.rs:572:25
+    |
+572 |     async fn top(&self, id: &ContainerId) -> Result<Vec<ProcessInfo>> {
+    |                         ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: field `config` is never read
+  --> crates\hyperbox-core\src\isolation\namespaces.rs:94:5
+   |
+93 | pub struct NamespaceManager {
+   |            ---------------- field in this struct
+94 |     config: NamespaceConfig,
+   |     ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: field `subnet` is never read
+  --> crates\hyperbox-core\src\network\bridge.rs:18:5
+   |
+16 | pub struct BridgeNetwork {
+   |            ------------- field in this struct
+17 |     name: String,
+18 |     subnet: String,
+   |     ^^^^^^
+
+warning: field `stop_timeout` is never read
+  --> crates\hyperbox-core\src\runtime\docker.rs:61:5
+   |
+55 | pub struct DockerRuntime {
+   |            ------------- field in this struct
+...
+61 |     stop_timeout: i64,
+   |     ^^^^^^^^^^^^
+
+warning: trait `ContainerRuntimeExt` is never used
+   --> crates\hyperbox-core\src\runtime\traits.rs:285:11
+    |
+285 | pub trait ContainerRuntimeExt: ContainerRuntime {
+    |           ^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:34:27
+   |
+34 |     RuntimeNotAvailable { runtime: String, path: PathBuf },
+   |                           ^^^^^^^^^^^^^^^
+   |
+note: the lint level is defined here
+  --> crates\hyperbox-core\src\lib.rs:30:9
+   |
+30 | #![warn(missing_docs)]
+   |         ^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:34:44
+   |
+34 |     RuntimeNotAvailable { runtime: String, path: PathBuf },
+   |                                            ^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:50:23
+   |
+50 |     CgroupOperation { operation: String, reason: String },
+   |                       ^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:50:42
+   |
+50 |     CgroupOperation { operation: String, reason: String },
+   |                                          ^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:55:9
+   |
+55 |         namespace_type: String,
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:56:9
+   |
+56 |         reason: String,
+   |         ^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:69:28
+   |
+69 |     PortAllocationFailed { port: u16 },
+   |                            ^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:81:24
+   |
+81 |     PermissionDenied { operation: String, required: String },
+   |                        ^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:81:43
+   |
+81 |     PermissionDenied { operation: String, required: String },
+   |                                           ^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:86:9
+   |
+86 |         resource: String,
+   |         ^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:87:9
+   |
+87 |         limit: String,
+   |         ^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:88:9
+   |
+88 |         requested: String,
+   |         ^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:93:15
+   |
+93 |     Timeout { operation: String, duration_ms: u64 },
+   |               ^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:93:34
+   |
+93 |     Timeout { operation: String, duration_ms: u64 },
+   |                                  ^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:97:19
+   |
+97 |     InvalidSpec { field: String, reason: String },
+   |                   ^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> crates\hyperbox-core\src\error.rs:97:34
+   |
+97 |     InvalidSpec { field: String, reason: String },
+   |                                  ^^^^^^^^^^^^^^
+
+warning: missing documentation for a constant
+  --> crates\hyperbox-core\src\network\cni.rs:11:1
+   |
+11 | pub const CNI_CONF_DIR: &str = "/etc/cni/net.d";
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `hyperbox-core` (lib) generated 26 warnings (run `cargo fix --lib -p hyperbox-core` to apply 2 suggestions)
+warning: unused variable: `layer_digest`
+   --> crates\hyperbox-optimize\src\lazy_load.rs:324:33
+    |
+324 |     async fn fetch_chunk(&self, layer_digest: &str, entry: &TocEntry) -> Result<Vec<u8>> {
+    |                                 ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_layer_digest`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `container`
+   --> crates\hyperbox-optimize\src\prewarm.rs:189:37
+    |
+189 |                     if let Some((_, container)) = prewarmed.remove(&id) {
+    |                                     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_container`
+
+warning: unused variable: `end`
+   --> crates\hyperbox-optimize\src\predict.rs:364:13
+    |
+364 |         let end = now + Duration::minutes(window_minutes as i64);
+    |             ^^^ help: if this is intentional, prefix it with an underscore: `_end`
+
+warning: fields `is_weekend` and `minutes` are never read
+  --> crates\hyperbox-optimize\src\predict.rs:45:5
+   |
+39 | struct TimeFeatures {
+   |        ------------ fields in this struct
+...
+45 |     is_weekend: bool,
+   |     ^^^^^^^^^^
+46 |     /// Minutes since midnight.
+47 |     minutes: u16,
+   |     ^^^^^^^
+   |
+   = note: `TimeFeatures` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` on by default
+
+warning: `hyperbox-optimize` (lib) generated 4 warnings
+warning: unused import: `BenchmarkId`
+  --> crates\hyperbox-optimize\benches\comprehensive_benchmarks.rs:12:61
+   |
+12 | use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+   |                                                             ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused variable: `container_id`
+  --> crates\hyperbox-optimize\benches\comprehensive_benchmarks.rs:79:17
+   |
+79 |             let container_id = black_box("container_test_12345");
+   |                 ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_container_id`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `container_id`
+  --> crates\hyperbox-optimize\benches\comprehensive_benchmarks.rs:95:17
+   |
+95 |             let container_id = black_box("container_test_12345");
+   |                 ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_container_id`
+
+warning: unused variable: `layer_id`
+   --> crates\hyperbox-optimize\benches\comprehensive_benchmarks.rs:134:17
+    |
+134 |             let layer_id = black_box("sha256:abc123def456...");
+    |                 ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_layer_id`
+
+warning: variable does not need to be mutable
+    --> crates\hyperbox-optimize\src\dedup.rs:1494:13
+     |
+1494 |         let mut data_a = vec![0u8; 100_000];
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` on by default
+
+warning: unused variable: `i`
+    --> crates\hyperbox-optimize\src\memory.rs:1098:13
+     |
+1098 |         for i in 0..MAX_HISTORY_SAMPLES + 100 {
+     |             ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `day`
+   --> crates\hyperbox-optimize\src\predict.rs:466:43
+    |
+466 |     fn make_event(image: &str, hour: u32, day: Weekday) -> UsageEvent {
+    |                                           ^^^ help: if this is intentional, prefix it with an underscore: `_day`
+
+warning: unused variable: `rate`
+   --> crates\hyperbox-optimize\src\prewarm.rs:556:26
+    |
+556 |         let (_, hits, _, rate) = manager.stats();
+    |                          ^^^^ help: if this is intentional, prefix it with an underscore: `_rate`
+
+warning: function `make_event` is never used
+   --> crates\hyperbox-optimize\src\predict.rs:466:8
+    |
+466 |     fn make_event(image: &str, hour: u32, day: Weekday) -> UsageEvent {
+    |        ^^^^^^^^^^
+
+warning: unused import: `std::time::Duration`
+ --> crates\hyperbox-optimize\benches\optimize_benchmarks.rs:6:5
+  |
+6 | use std::time::Duration;
+  |     ^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: `hyperbox-optimize` (bench "comprehensive_benchmarks") generated 4 warnings (run `cargo fix --bench "comprehensive_benchmarks"` to apply 1 suggestion)
+warning: `hyperbox-optimize` (lib test) generated 9 warnings (4 duplicates) (run `cargo fix --lib -p hyperbox-optimize --tests` to apply 1 suggestion)
+warning: `hyperbox-optimize` (bench "optimize_benchmarks") generated 1 warning (run `cargo fix --bench "optimize_benchmarks"` to apply 1 suggestion)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 1.58s
+     Running unittests src\lib.rs (target\release\deps\hyperbox_optimize-4af965fc5f9ce23b.exe)
+
+running 158 tests
+test criu::tests::test_checkpoint_age_validation ... ignored
+test criu::tests::test_checkpoint_incremental_without_criu_fails ... ignored
+test criu::tests::test_checkpoint_metadata_serialization ... ignored
+test criu::tests::test_checkpoint_without_criu_fails ... ignored
+test criu::tests::test_cleanup_demand_paged_empty ... ignored
+test criu::tests::test_criu_manager_creation ... ignored
+test criu::tests::test_criu_manager_initialize ... ignored
+test criu::tests::test_criu_options_default ... ignored
+test criu::tests::test_delete_checkpoint_nonexistent ... ignored
+test criu::tests::test_directory_size_empty ... ignored
+test criu::tests::test_directory_size_with_files ... ignored
+test criu::tests::test_find_criu_returns_option ... ignored
+test criu::tests::test_get_checkpoint_not_found ... ignored
+test criu::tests::test_get_pre_dump_chain_empty ... ignored
+test criu::tests::test_lazy_pages_config_creation ... ignored
+test criu::tests::test_list_checkpoints_empty ... ignored
+test criu::tests::test_page_server_config_creation ... ignored
+test criu::tests::test_pre_dump_chain_serialization ... ignored
+test criu::tests::test_pre_dump_entry_serialization ... ignored
+test criu::tests::test_pre_dump_without_criu_fails ... ignored
+test criu::tests::test_restore_lazy_without_criu_fails ... ignored
+test criu::tests::test_restore_mode_variants ... ignored
+test criu::tests::test_restore_stats_serialization ... ignored
+test criu::tests::test_restore_without_criu_fails ... ignored
+test criu::tests::test_start_page_server_without_criu_fails ... ignored
+test criu::tests::test_stop_lazy_pages_noop ... ignored
+test criu::tests::test_stop_page_server_noop ... ignored
+test dedup::tests::test_bloom_filter_basic ... ignored
+test dedup::tests::test_bloom_filter_clear ... ignored
+test dedup::tests::test_bloom_filter_fpr_reasonable ... ignored
+test dedup::tests::test_bloom_filter_memory_size ... ignored
+test dedup::tests::test_bloom_filter_no_false_negatives ... ignored
+test dedup::tests::test_chunk_config_validation ... ignored
+test dedup::tests::test_chunk_store_basic ... ignored
+test dedup::tests::test_chunk_store_duplicate ... ignored
+test dedup::tests::test_chunk_store_get_missing ... ignored
+test dedup::tests::test_chunk_store_lz4_compression ... ignored
+test dedup::tests::test_chunk_store_zstd_compression ... ignored
+test dedup::tests::test_compression_roundtrip_lz4 ... ignored
+test dedup::tests::test_compression_roundtrip_none ... ignored
+test dedup::tests::test_compression_roundtrip_zstd ... ignored
+test dedup::tests::test_dedup_manager_basic ... ignored
+test dedup::tests::test_dedup_manager_diff ... ignored
+test dedup::tests::test_dedup_manager_evict ... ignored
+test dedup::tests::test_deduplicator_bloom_memory ... ignored
+test dedup::tests::test_deduplicator_detects_duplicates ... ignored
+test dedup::tests::test_deduplicator_partial_overlap ... ignored
+test dedup::tests::test_deduplicator_process_layer ... ignored
+test dedup::tests::test_deduplicator_stats ... ignored
+test dedup::tests::test_fastcdc_basic_chunking ... ignored
+test dedup::tests::test_fastcdc_chunk_size_bounds ... ignored
+test dedup::tests::test_fastcdc_content_sensitivity ... ignored
+test dedup::tests::test_fastcdc_deterministic ... ignored
+test dedup::tests::test_fastcdc_empty_data ... ignored
+test dedup::tests::test_fastcdc_small_data ... ignored
+test dedup::tests::test_gear_table_nonzero ... ignored
+test dedup::tests::test_gear_table_unique ... ignored
+test dedup::tests::test_hash_hex_format ... ignored
+test dedup::tests::test_merkle_diff_all_different ... ignored
+test dedup::tests::test_merkle_diff_identical ... ignored
+test dedup::tests::test_merkle_diff_single_change ... ignored
+test dedup::tests::test_merkle_diff_structural_change ... ignored
+test dedup::tests::test_merkle_tree_build ... ignored
+test dedup::tests::test_merkle_tree_empty ... ignored
+test dedup::tests::test_merkle_tree_root_deterministic ... ignored
+test dedup::tests::test_merkle_tree_single_leaf ... ignored
+test dedup::tests::test_sha256_hash_deterministic ... ignored
+test dedup::tests::test_sha256_hash_different_inputs ... ignored
+test lazy_load::tests::test_cache_hit_rate_zero_when_no_accesses ... ignored
+test lazy_load::tests::test_get_prefetch_list_layer_not_found ... ignored
+test lazy_load::tests::test_get_progress_layer_not_found ... ignored
+test lazy_load::tests::test_layer_not_found ... ignored
+test lazy_load::tests::test_layer_state_creation ... ignored
+test lazy_load::tests::test_lazy_layer_loader_creation ... ignored
+test lazy_load::tests::test_lazy_layer_loader_initialize ... ignored
+test lazy_load::tests::test_parse_toc_empty ... ignored
+test lazy_load::tests::test_parse_toc_with_valid_json ... ignored
+test lazy_load::tests::test_stats_initial_values ... ignored
+test lazy_load::tests::test_toc_entry_serialization ... ignored
+test lazy_load::tests::test_toc_entry_types ... ignored
+test lazy_load::tests::test_toc_serialization ... ignored
+test memory::tests::balloon_reason_display ... ignored
+test memory::tests::compute_adjustment_idle_reclaim ... ignored
+test memory::tests::compute_adjustment_no_limit ... ignored
+test memory::tests::config_watermark_ordering ... ignored
+test memory::tests::container_state_ema_updates ... ignored
+test memory::tests::container_state_idle_detection ... ignored
+test memory::tests::container_state_not_idle_with_changes ... ignored
+test memory::tests::default_config_sane ... ignored
+test memory::tests::free_page_report_fields ... ignored
+test memory::tests::history_compaction ... ignored
+test memory::tests::ksm_status_defaults ... ignored
+test memory::tests::manual_balloon_missing_container ... ignored
+test memory::tests::manual_balloon_set ... ignored
+test memory::tests::page_size_detection ... ignored
+test memory::tests::register_and_unregister ... ignored
+test memory::tests::reset_all_balloons ... ignored
+test memory::tests::sample_reclaimable ... ignored
+test memory::tests::sample_usage_ratio ... ignored
+test memory::tests::sample_working_set ... ignored
+test memory::tests::sample_zero_limit ... ignored
+test memory::tests::stats_snapshot_zero ... ignored
+test memory::tests::total_working_set_and_reclaimable ... ignored
+test nydus::tests::test_build_daemon_config_http ... ignored
+test nydus::tests::test_build_daemon_config_json ... ignored
+test nydus::tests::test_cache_stats_default ... ignored
+test nydus::tests::test_cache_stats_empty_dir ... ignored
+test nydus::tests::test_convert_image_without_nydus_fails ... ignored
+test nydus::tests::test_daemon_status_serialization ... ignored
+test nydus::tests::test_default_daemon_config ... ignored
+test nydus::tests::test_find_binary_returns_none_for_nonexistent ... ignored
+test nydus::tests::test_gc_cache_empty ... ignored
+test nydus::tests::test_gc_cache_under_limit ... ignored
+test nydus::tests::test_get_daemon_status_none ... ignored
+test nydus::tests::test_get_image_none ... ignored
+test nydus::tests::test_list_daemons_empty ... ignored
+test nydus::tests::test_manager_creation ... ignored
+test nydus::tests::test_manager_initialize_creates_dirs ... ignored
+test nydus::tests::test_nydus_cache_type_variants ... ignored
+test nydus::tests::test_nydus_fs_driver_variants ... ignored
+test nydus::tests::test_nydus_image_serialization ... ignored
+test nydus::tests::test_prefetch_files_no_daemon ... ignored
+test nydus::tests::test_sanitize_image_ref ... ignored
+test nydus::tests::test_shutdown_empty ... ignored
+test nydus::tests::test_start_daemon_without_nydus_fails ... ignored
+test nydus::tests::test_stop_daemon_noop ... ignored
+test nydus::tests::test_validate_image_without_nydus_fails ... ignored
+test predict::tests::test_get_predictions ... ignored
+test predict::tests::test_initialize_creates_directory ... ignored
+test predict::tests::test_model_stats ... ignored
+test predict::tests::test_predict_insufficient_samples ... ignored
+test predict::tests::test_predict_no_data ... ignored
+test predict::tests::test_predict_window ... ignored
+test predict::tests::test_predict_with_sufficient_samples ... ignored
+test predict::tests::test_predictions_count_increment ... ignored
+test predict::tests::test_record_event ... ignored
+test predict::tests::test_record_multiple_events_same_image ... ignored
+test predict::tests::test_save_and_load ... ignored
+test predict::tests::test_time_features_weekend ... ignored
+test predict::tests::test_tracked_images ... ignored
+test predict::tests::test_train_insufficient_data ... ignored
+test predict::tests::test_train_sufficient_data ... ignored
+test predict::tests::test_usage_predictor_new ... ignored
+test prewarm::tests::test_average_hit_score ... ignored
+test prewarm::tests::test_claim_already_used ... ignored
+test prewarm::tests::test_claim_nonexistent_image ... ignored
+test prewarm::tests::test_claim_prewarmed_container ... ignored
+test prewarm::tests::test_get_suggestions ... ignored
+test prewarm::tests::test_hit_rate_calculation ... ignored
+test prewarm::tests::test_initialize_creates_directory ... ignored
+test prewarm::tests::test_prewarm_config_default ... ignored
+test prewarm::tests::test_prewarm_container ... ignored
+test prewarm::tests::test_prewarm_duplicate_image ... ignored
+test prewarm::tests::test_prewarm_manager_new ... ignored
+test prewarm::tests::test_prewarm_manager_with_config ... ignored
+test prewarm::tests::test_prewarm_max_limit ... ignored
+test prewarm::tests::test_prewarmed_container_struct ... ignored
+test prewarm::tests::test_stop_clears_prewarmed ... ignored
+
+test result: ok. 0 passed; 0 failed; 158 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running benches\comprehensive_benchmarks.rs (target\release\deps\comprehensive_benchmarks-b4ea4020c193cfbc.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running benches\optimize_benchmarks.rs (target\release\deps\optimize_benchmarks-66e91457894d8baa.exe)
+Gnuplot not found or not usable, using plotters backend
+`gnuplot --version` returned an unparseable version string: g n u p l o t   6 . 0   p a t c h l e v e l   3 
+ 
+Benchmarking criu_checkpoint_prep
+Benchmarking criu_checkpoint_prep: Warming up for 3.0000 s
+Benchmarking criu_checkpoint_prep: Collecting 100 samples in estimated 5.0000 s (4.7B iterations)
+Benchmarking criu_checkpoint_prep: Analyzing
+criu_checkpoint_prep    time:   [1.0958 ns 1.1358 ns 1.1836 ns]
+                        change: [-14.384% -10.143% -5.6432%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking lazy_layer_lookup
+Benchmarking lazy_layer_lookup: Warming up for 3.0000 s
+Benchmarking lazy_layer_lookup: Collecting 100 samples in estimated 5.0001 s (115M iterations)
+Benchmarking lazy_layer_lookup: Analyzing
+lazy_layer_lookup       time:   [36.087 ns 37.245 ns 38.641 ns]
+                        change: [+0.3937% +6.8710% +14.150%] (p = 0.05 < 0.05)
+                        Change within noise threshold.
+
+Benchmarking prediction_update
+Benchmarking prediction_update: Warming up for 3.0000 s
+Benchmarking prediction_update: Collecting 100 samples in estimated 5.2494 s (56k iterations)
+Benchmarking prediction_update: Analyzing
+prediction_update       time:   [88.314 ┬╡s 93.299 ┬╡s 98.836 ┬╡s]
+                        change: [+23.981% +33.188% +42.439%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+
+Benchmarking prewarm_selection/100
+Benchmarking prewarm_selection/100: Warming up for 3.0000 s
+Benchmarking prewarm_selection/100: Collecting 100 samples in estimated 5.0103 s (954k iterations)
+Benchmarking prewarm_selection/100: Analyzing
+prewarm_selection/100   time:   [4.5161 ┬╡s 4.8030 ┬╡s 5.1199 ┬╡s]
+                        change: [+3.7609% +11.470% +19.754%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Benchmarking prewarm_selection/1000
+Benchmarking prewarm_selection/1000: Warming up for 3.0000 s
+Benchmarking prewarm_selection/1000: Collecting 100 samples in estimated 5.1723 s (96k iterations)
+Benchmarking prewarm_selection/1000: Analyzing
+prewarm_selection/1000  time:   [47.035 ┬╡s 49.824 ┬╡s 52.903 ┬╡s]
+                        change: [-1.7406% +5.9600% +14.545%] (p = 0.13 > 0.05)
+                        No change in performance detected.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+Benchmarking prewarm_selection/10000
+Benchmarking prewarm_selection/10000: Warming up for 3.0000 s
+Benchmarking prewarm_selection/10000: Collecting 100 samples in estimated 5.1265 s (10k iterations)
+Benchmarking prewarm_selection/10000: Analyzing
+prewarm_selection/10000 time:   [509.47 ┬╡s 542.26 ┬╡s 576.88 ┬╡s]
+                        change: [-16.337% -10.146% -2.9848%] (p = 0.01 < 0.05)
+                        Performance has improved.
+Found 7 outliers among 100 measurements (7.00%)
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking compression_estimation
+Benchmarking compression_estimation: Warming up for 3.0000 s
+Benchmarking compression_estimation: Collecting 100 samples in estimated 5.0023 s (2.5M iterations)
+Benchmarking compression_estimation: Analyzing
+compression_estimation  time:   [1.7488 ┬╡s 1.8403 ┬╡s 1.9365 ┬╡s]
+                        change: [-22.780% -17.421% -11.622%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  5 (5.00%) high mild
+
+Benchmarking dedup_lookup
+Benchmarking dedup_lookup: Warming up for 3.0000 s
+Benchmarking dedup_lookup: Collecting 100 samples in estimated 5.0001 s (180M iterations)
+Benchmarking dedup_lookup: Analyzing
+dedup_lookup            time:   [24.257 ns 25.486 ns 26.722 ns]
+                        change: [-34.913% -30.875% -26.156%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 8 outliers among 100 measurements (8.00%)
+  6 (6.00%) high mild
+  2 (2.00%) high severe
+
