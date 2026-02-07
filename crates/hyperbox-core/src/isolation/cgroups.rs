@@ -2,6 +2,8 @@
 
 use crate::error::{CoreError, Result};
 use crate::types::ResourceLimits;
+#[cfg(unix)]
+use nix::libc;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::{debug, instrument};
@@ -56,12 +58,12 @@ impl CgroupManager {
 
         // Create hyperbox slice if it doesn't exist
         if !self.hyperbox_slice.exists() {
-            fs::create_dir_all(&self.hyperbox_slice).await.map_err(|e| {
-                CoreError::CgroupOperation {
+            fs::create_dir_all(&self.hyperbox_slice)
+                .await
+                .map_err(|e| CoreError::CgroupOperation {
                     operation: "create hyperbox slice".to_string(),
                     reason: e.to_string(),
-                }
-            })?;
+                })?;
         }
 
         // Enable controllers
@@ -100,14 +102,16 @@ impl CgroupManager {
     /// Create a cgroup for a container.
     #[instrument(skip(self))]
     pub async fn create_container_cgroup(&self, container_id: &str) -> Result<PathBuf> {
-        let cgroup_path = self.hyperbox_slice.join(format!("container-{container_id}"));
+        let cgroup_path = self
+            .hyperbox_slice
+            .join(format!("container-{container_id}"));
 
-        fs::create_dir_all(&cgroup_path).await.map_err(|e| {
-            CoreError::CgroupOperation {
+        fs::create_dir_all(&cgroup_path)
+            .await
+            .map_err(|e| CoreError::CgroupOperation {
                 operation: "create container cgroup".to_string(),
                 reason: e.to_string(),
-            }
-        })?;
+            })?;
 
         debug!("Created container cgroup at {:?}", cgroup_path);
         Ok(cgroup_path)
@@ -156,19 +160,19 @@ impl CgroupManager {
         // PIDs limit
         if let Some(pids) = limits.pids_limit {
             let pids_max = cgroup_path.join("pids.max");
-            fs::write(&pids_max, pids.to_string())
-                .await
-                .map_err(|e| CoreError::CgroupOperation {
+            fs::write(&pids_max, pids.to_string()).await.map_err(|e| {
+                CoreError::CgroupOperation {
                     operation: "set pids limit".to_string(),
                     reason: e.to_string(),
-                })?;
+                }
+            })?;
         }
 
         // IO limits
         if limits.io_read_bps.is_some() || limits.io_write_bps.is_some() {
             // Would need device major:minor for io.max
             // This is simplified; production would query devices
-            let io_max = cgroup_path.join("io.max");
+            let _io_max = cgroup_path.join("io.max");
             let mut io_config = String::new();
 
             if let Some(read_bps) = limits.io_read_bps {
@@ -256,12 +260,12 @@ impl CgroupManager {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         // Remove the cgroup directory
-        fs::remove_dir(cgroup_path).await.map_err(|e| {
-            CoreError::CgroupOperation {
+        fs::remove_dir(cgroup_path)
+            .await
+            .map_err(|e| CoreError::CgroupOperation {
                 operation: "remove cgroup".to_string(),
                 reason: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(())
     }
@@ -297,20 +301,14 @@ mod tests {
     fn test_cgroup_manager_creation() {
         let manager = CgroupManager::new();
         assert_eq!(manager.base_path, PathBuf::from("/sys/fs/cgroup"));
-        assert_eq!(
-            manager.hyperbox_slice,
-            PathBuf::from("/sys/fs/cgroup/hyperbox.slice")
-        );
+        assert_eq!(manager.hyperbox_slice, PathBuf::from("/sys/fs/cgroup/hyperbox.slice"));
     }
 
     #[test]
     fn test_cgroup_manager_custom_path() {
         let manager = CgroupManager::with_base_path("/custom/cgroup");
         assert_eq!(manager.base_path, PathBuf::from("/custom/cgroup"));
-        assert_eq!(
-            manager.hyperbox_slice,
-            PathBuf::from("/custom/cgroup/hyperbox.slice")
-        );
+        assert_eq!(manager.hyperbox_slice, PathBuf::from("/custom/cgroup/hyperbox.slice"));
     }
 
     #[test]
@@ -358,7 +356,7 @@ mod tests {
 
             let limits = ResourceLimits {
                 memory_bytes: Some(1024 * 1024 * 512), // 512MB
-                cpu_millicores: Some(1000),             // 1 CPU
+                cpu_millicores: Some(1000),            // 1 CPU
                 pids_limit: Some(100),
                 ..Default::default()
             };
@@ -410,4 +408,3 @@ mod tests {
         }
     }
 }
-

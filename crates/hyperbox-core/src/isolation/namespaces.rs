@@ -1,9 +1,10 @@
 //! Linux namespace management.
 
+use crate::error::{CoreError, Result};
 use std::collections::HashSet;
 use std::path::PathBuf;
+#[cfg(unix)]
 use std::process::Command;
-use crate::error::CoreError;
 
 /// Types of Linux namespaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

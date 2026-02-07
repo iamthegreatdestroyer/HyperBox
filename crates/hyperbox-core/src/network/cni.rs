@@ -3,9 +3,10 @@
 use crate::error::{CoreError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
-use tracing::debug;
+use tracing::{debug, info};
 
 /// CNI plugin paths.
 pub const CNI_BIN_DIR: &str = "/opt/cni/bin";

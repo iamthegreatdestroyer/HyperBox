@@ -569,7 +569,7 @@ impl ContainerRuntime for CrunRuntime {
         Ok(())
     }
 
-    async fn top(&self, id: &ContainerId) -> Result<Vec<ProcessInfo>> {
+    async fn top(&self, _id: &ContainerId) -> Result<Vec<ProcessInfo>> {
         // Would read from /proc filesystem for container PID namespace
         Ok(Vec::new())
     }

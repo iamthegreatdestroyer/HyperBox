@@ -36,6 +36,7 @@ async fn main() -> Result<()> {
         Commands::Container(cmd) => commands::container::run(cmd).await,
         Commands::Image(cmd) => commands::image::run(cmd).await,
         Commands::System(cmd) => commands::system::run(cmd).await,
+        Commands::Health(cmd) => commands::health::run(cmd).await,
         Commands::Completion(cmd) => commands::completion::run(cmd),
         Commands::Docker(cmd) => {
             cmd.execute(cli.output)

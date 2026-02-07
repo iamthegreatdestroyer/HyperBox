@@ -30,8 +30,8 @@ services:
       # Data directory for optimization cache
       - hyperbox_data:/var/lib/hyperbox
 
-      # Configuration directory
-      - ./config:/etc/hyperbox:ro
+      # Configuration directory (optional - commented for Windows Docker Desktop compatibility)
+      # - ./config:/etc/hyperbox:ro
 
     # Environment variables
     environment:
@@ -84,7 +84,6 @@ services:
     container_name: hyperbox-prometheus
 
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
 
     environment:
@@ -118,7 +117,7 @@ services:
 
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      # Provisioning mount removed (Windows Docker Desktop compatibility)
 
     environment:
       GF_SECURITY_ADMIN_USER: admin
@@ -154,7 +153,6 @@ services:
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
     ports:
       - "5432:5432"

@@ -45,6 +45,9 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
+#[cfg(unix)]
+use libc;
+
 // ── Constants ────────────────────────────────────────────────────────────────
 
 /// Default polling interval for memory sampling (milliseconds).
@@ -102,7 +105,7 @@ impl Default for MemoryConfig {
             low_watermark: DEFAULT_LOW_WATERMARK,
             poll_interval_ms: DEFAULT_POLL_INTERVAL_MS,
             min_memory_bytes: 32 * 1_024 * 1_024, // 32 MiB floor
-            max_total_memory_bytes: 0,             // auto-detect from host
+            max_total_memory_bytes: 0,            // auto-detect from host
             aggressive_idle_reclaim: true,
             idle_change_threshold: 0.05,
             cgroup_root: PathBuf::from("/sys/fs/cgroup"),
@@ -495,11 +498,7 @@ impl DynamicMemoryManager {
     ///
     /// The cgroup path is `{cgroup_root}/hyperbox/{container_id}` by default.
     pub async fn sample_container(&self, container_id: &str) -> Result<MemorySample> {
-        let cg_path = self
-            .config
-            .cgroup_root
-            .join("hyperbox")
-            .join(container_id);
+        let cg_path = self.config.cgroup_root.join("hyperbox").join(container_id);
 
         let current_bytes = read_cgroup_u64(&cg_path, "memory.current").await?;
         let limit_bytes = read_cgroup_u64(&cg_path, "memory.max")
@@ -647,9 +646,7 @@ impl DynamicMemoryManager {
         }
 
         // ── Normal reclaim: working-set well below limit ─────────────────
-        if desired < current_effective
-            && sample.usage_ratio() < self.config.low_watermark
-        {
+        if desired < current_effective && sample.usage_ratio() < self.config.low_watermark {
             let new_balloon = limit.saturating_sub(desired);
             let delta = new_balloon.saturating_sub(current_balloon);
             if delta >= MIN_BALLOON_STEP {
@@ -697,10 +694,7 @@ impl DynamicMemoryManager {
                 match manager.poll_once().await {
                     Ok(adjustments) => {
                         if !adjustments.is_empty() {
-                            info!(
-                                count = adjustments.len(),
-                                "applied balloon adjustments"
-                            );
+                            info!(count = adjustments.len(), "applied balloon adjustments");
                         }
                     }
                     Err(e) => {
@@ -876,12 +870,11 @@ impl DynamicMemoryManager {
 
     /// Manual balloon set for a specific container.
     pub async fn set_balloon(&self, container_id: &str, target_bytes: u64) -> Result<()> {
-        let mut state = self
-            .containers
-            .get_mut(container_id)
-            .ok_or_else(|| OptimizeError::ResourceExhausted {
+        let mut state = self.containers.get_mut(container_id).ok_or_else(|| {
+            OptimizeError::ResourceExhausted {
                 resource: format!("container not tracked: {container_id}"),
-            })?;
+            }
+        })?;
 
         let prev = state.balloon_inflated_bytes;
         state.balloon_target_bytes = target_bytes;
@@ -925,11 +918,11 @@ async fn read_cgroup_u64(cg_path: &Path, filename: &str) -> Result<u64> {
     if trimmed == "max" {
         return Ok(u64::MAX);
     }
-    trimmed.parse::<u64>().map_err(|_| {
-        OptimizeError::PredictionFailed {
+    trimmed
+        .parse::<u64>()
+        .map_err(|_| OptimizeError::PredictionFailed {
             reason: format!("cannot parse {}: {trimmed:?}", path.display()),
-        }
-    })
+        })
 }
 
 /// Read and parse `memory.stat` from a cgroup directory.
@@ -943,10 +936,7 @@ async fn read_cgroup_stat(cg_path: &Path) -> Result<CgroupMemStat> {
     for line in content.lines() {
         let mut parts = line.split_whitespace();
         let key = parts.next().unwrap_or_default();
-        let val: u64 = parts
-            .next()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(0);
+        let val: u64 = parts.next().and_then(|v| v.parse().ok()).unwrap_or(0);
 
         match key {
             "inactive_file" => stat.inactive_file = val,
@@ -993,7 +983,8 @@ mod tests {
 
     #[test]
     fn sample_working_set() {
-        let s = make_sample(500 * 1024 * 1024, 1024 * 1024 * 1024, 200 * 1024 * 1024, 50 * 1024 * 1024);
+        let s =
+            make_sample(500 * 1024 * 1024, 1024 * 1024 * 1024, 200 * 1024 * 1024, 50 * 1024 * 1024);
         assert_eq!(s.working_set_bytes(), 250 * 1024 * 1024);
     }
 
@@ -1007,7 +998,8 @@ mod tests {
     #[test]
     fn sample_reclaimable() {
         // current=500M, working_set=250M → reclaimable=250M
-        let s = make_sample(500 * 1024 * 1024, 1024 * 1024 * 1024, 200 * 1024 * 1024, 50 * 1024 * 1024);
+        let s =
+            make_sample(500 * 1024 * 1024, 1024 * 1024 * 1024, 200 * 1024 * 1024, 50 * 1024 * 1024);
         assert_eq!(s.reclaimable_bytes(), 250 * 1024 * 1024);
     }
 
@@ -1188,10 +1180,10 @@ mod tests {
         // Push enough identical samples to become idle.
         for _ in 0..40 {
             state.push_sample(make_sample(
-                100 * 1024 * 1024,   // 100 MiB current
-                1024 * 1024 * 1024,  // 1 GiB limit
-                30 * 1024 * 1024,    // 30 MiB anon
-                10 * 1024 * 1024,    // 10 MiB active_file
+                100 * 1024 * 1024,  // 100 MiB current
+                1024 * 1024 * 1024, // 1 GiB limit
+                30 * 1024 * 1024,   // 30 MiB anon
+                10 * 1024 * 1024,   // 10 MiB active_file
             ));
             state.update_idle(0.05);
         }

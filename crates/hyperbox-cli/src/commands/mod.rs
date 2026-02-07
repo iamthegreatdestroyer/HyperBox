@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 pub mod compat;
 pub mod completion;
 pub mod container;
+pub mod health;
 pub mod image;
 pub mod project;
 pub mod system;
@@ -70,6 +71,9 @@ pub enum Commands {
     /// System commands
     #[command(alias = "sys")]
     System(system::SystemCommand),
+
+    /// Check HyperBox health status
+    Health(health::HealthCommand),
 
     /// Generate shell completions
     Completion(completion::CompletionCommand),

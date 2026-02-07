@@ -40,7 +40,9 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user for security
 RUN useradd -m -u 1000 hyperbox && \
     mkdir -p /var/lib/hyperbox && \
-    chown -R hyperbox:hyperbox /var/lib/hyperbox
+    mkdir -p /etc/hyperbox && \
+    chown -R hyperbox:hyperbox /var/lib/hyperbox && \
+    chown -R hyperbox:hyperbox /etc/hyperbox
 
 # Copy binaries from builder
 COPY --from=builder /build/target/release/hyperboxd /usr/local/bin/

@@ -813,17 +813,19 @@ impl SecurityStack {
         {
             match _ns_mgr.setup_network_namespace(container_id).await {
                 Ok(path) => {
+                    let ns_path_display = path.display().to_string();
                     debug!(
                         container = %container_id,
-                        ns_path = %path.display(),
+                        ns_path = %ns_path_display,
                         "namespace isolation applied",
                     );
                     report.record(SecurityLayerKind::UserNamespaces, LayerOutcome::Applied);
                 }
                 Err(e) => {
+                    let err_display = e.to_string();
                     warn!(
                         container = %container_id,
-                        err = %e,
+                        err = %err_display,
                         "namespace setup failed",
                     );
                     report.record(
