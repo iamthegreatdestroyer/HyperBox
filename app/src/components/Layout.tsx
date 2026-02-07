@@ -5,6 +5,7 @@ import {
   Box,
   Layers,
   Gauge,
+  Terminal,
   Settings,
   Zap,
   Circle,
@@ -23,6 +24,7 @@ const navigation = [
   { name: "Containers", href: "/containers", icon: Box },
   { name: "Images", href: "/images", icon: Layers },
   { name: "Performance", href: "/performance", icon: Gauge },
+  { name: "Terminal", href: "/terminal", icon: Terminal },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

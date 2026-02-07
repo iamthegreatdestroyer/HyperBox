@@ -5,6 +5,7 @@ import Projects from "./pages/Projects";
 import Containers from "./pages/Containers";
 import Images from "./pages/Images";
 import Performance from "./pages/Performance";
+import Terminal from "./pages/Terminal";
 import Settings from "./pages/Settings";
 import { useSystemStore } from "./stores/system";
 import { useEffect } from "react";
@@ -35,6 +36,7 @@ function App() {
         <Route path="/containers" element={<Containers />} />
         <Route path="/images" element={<Images />} />
         <Route path="/performance" element={<Performance />} />
+        <Route path="/terminal" element={<Terminal />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

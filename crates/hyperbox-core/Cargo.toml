@@ -58,6 +58,7 @@ default = []
 crun = []
 youki = []
 firecracker = []
+wasm = []
 
 [lints]
 workspace = true

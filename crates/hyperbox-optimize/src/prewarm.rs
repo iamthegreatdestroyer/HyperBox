@@ -122,8 +122,10 @@ impl PrewarmManager {
     pub async fn start(&self) {
         let shutdown = Arc::clone(&self.shutdown);
         let config = self.config.clone();
+        let predictor_ref = Arc::clone(&self.predictor);
 
-        // Start prediction loop
+        // Start prediction loop — periodically query the predictor for
+        // candidate images that exceed the pre-warm threshold.
         tokio::spawn(async move {
             let mut interval =
                 time::interval(std::time::Duration::from_secs(config.lookahead_seconds / 2));
@@ -135,8 +137,26 @@ impl PrewarmManager {
                     break;
                 }
 
-                // Run predictions and pre-warm
-                // In practice, this would call the predictor and trigger pre-warming
+                // Query the predictor for the top candidates within the
+                // lookahead window and log any that exceed the threshold.
+                let window_min = (config.lookahead_seconds / 60).max(1);
+                let candidates = predictor_ref.get_predictions(window_min, config.max_prewarmed);
+
+                let above: Vec<_> = candidates
+                    .into_iter()
+                    .filter(|(_, s)| *s >= config.threshold)
+                    .collect();
+
+                if !above.is_empty() {
+                    debug!(
+                        "Prediction cycle: {} candidate(s) above threshold {:.2}",
+                        above.len(),
+                        config.threshold,
+                    );
+                    for (image, score) in &above {
+                        debug!("  prewarm candidate: {} (score={:.3})", image, score);
+                    }
+                }
             }
         });
 
@@ -247,15 +267,24 @@ impl PrewarmManager {
         container_id
     }
 
-    /// Get suggestions for images to pre-warm.
+    /// Get suggestions for images to pre-warm, ranked by prediction score.
     pub async fn get_suggestions(&self) -> Vec<(String, f64)> {
-        // Get predictions from the usage predictor
-        let now = Utc::now();
-        let lookahead = std::time::Duration::from_secs(self.config.lookahead_seconds);
+        let window = (self.config.lookahead_seconds / 60).max(1);
+        let candidates = self
+            .predictor
+            .get_predictions(window, self.config.max_prewarmed * 2);
 
-        // In practice, this would query the predictor
-        // For now, return empty list
-        Vec::new()
+        // Filter: above threshold and not already pre-warmed.
+        candidates
+            .into_iter()
+            .filter(|(image, score)| {
+                *score >= self.config.threshold
+                    && !self
+                        .prewarmed
+                        .iter()
+                        .any(|r| r.image == *image && !r.was_used)
+            })
+            .collect()
     }
 
     /// Get pre-warm hit rate.
@@ -291,6 +320,49 @@ impl PrewarmManager {
             self.stats.misses.load(Ordering::Relaxed),
             self.hit_rate(),
         )
+    }
+
+    /// Run one prediction-driven pre-warming cycle.
+    ///
+    /// Queries the predictor for candidates above threshold and pre-warms
+    /// each one that is not already in the pool.  Returns the IDs of
+    /// newly pre-warmed containers.
+    pub async fn run_prewarm_cycle(&self) -> Vec<String> {
+        let suggestions = self.get_suggestions().await;
+        let mut prewarmed_ids = Vec::new();
+
+        for (image, score) in suggestions {
+            match self.prewarm(&image, score).await {
+                Ok(id) => prewarmed_ids.push(id),
+                Err(e) => {
+                    debug!("Skipped pre-warming {}: {}", image, e);
+                }
+            }
+        }
+
+        if !prewarmed_ids.is_empty() {
+            info!("Pre-warm cycle: warmed {} container(s)", prewarmed_ids.len());
+        }
+
+        prewarmed_ids
+    }
+
+    /// Compute an adaptive threshold based on recent hit rate.
+    ///
+    /// * High hit rate (>70%) → lower threshold (pre-warm more aggressively)
+    /// * Low hit rate (<30%)  → raise threshold (reduce waste)
+    /// * Otherwise            → keep the configured default
+    pub fn adaptive_threshold(&self) -> f64 {
+        let rate = self.hit_rate();
+        let base = self.config.threshold;
+
+        if rate > 0.7 {
+            (base - 0.10).max(0.3)
+        } else if rate < 0.3 && rate > 0.0 {
+            (base + 0.10).min(0.95)
+        } else {
+            base
+        }
     }
 
     /// Stop the pre-warm manager.

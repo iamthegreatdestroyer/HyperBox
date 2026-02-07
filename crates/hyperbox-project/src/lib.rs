@@ -34,6 +34,7 @@
 
 pub mod config;
 pub mod detection;
+pub mod devcontainer;
 pub mod error;
 pub mod manager;
 pub mod orchestration;
@@ -44,6 +45,7 @@ pub mod watcher;
 
 pub use config::ProjectConfig;
 pub use detection::ProjectDetector;
+pub use devcontainer::DevContainerManager;
 pub use error::{ProjectError, Result};
 pub use manager::ProjectManager;
 pub use orchestration::ProjectOrchestrator;

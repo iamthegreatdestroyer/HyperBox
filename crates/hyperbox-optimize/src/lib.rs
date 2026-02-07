@@ -5,20 +5,25 @@
 //!
 //! - **CRIU Integration**: Checkpoint/restore for <100ms warm starts
 //! - **Lazy Layer Loading**: eStargz for on-demand file access
+//! - **FastCDC Deduplication**: Content-defined chunking with bloom filter dedup
 //! - **Predictive Pre-warming**: ML-based container pre-warming
 //! - **Usage Prediction**: Pattern recognition for resource optimization
 
 pub mod criu;
+pub mod dedup;
 pub mod error;
 pub mod lazy_load;
+pub mod memory;
 pub mod nydus;
 pub mod predict;
 pub mod prewarm;
 
 // Re-exports
 pub use criu::CriuManager;
+pub use dedup::ChunkDeduplicator;
 pub use error::{OptimizeError, Result};
 pub use lazy_load::LazyLayerLoader;
+pub use memory::DynamicMemoryManager;
 pub use nydus::NydusManager;
 pub use predict::UsagePredictor;
 pub use prewarm::PrewarmManager;
@@ -73,7 +78,7 @@ impl PerformanceMetrics {
 /// Prelude for common imports.
 pub mod prelude {
     pub use super::{
-        CriuManager, LazyLayerLoader, NydusManager, OptimizeError, PerformanceMetrics,
-        PrewarmManager, Result, UsagePredictor,
+        ChunkDeduplicator, CriuManager, DynamicMemoryManager, LazyLayerLoader, NydusManager,
+        OptimizeError, PerformanceMetrics, PrewarmManager, Result, UsagePredictor,
     };
 }

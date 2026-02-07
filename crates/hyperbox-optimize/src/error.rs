@@ -56,12 +56,18 @@ pub enum OptimizeError {
     ModelTrainingFailed { reason: String },
 
     /// Insufficient data.
-    #[error("Insufficient data for prediction: need at least {required} samples, have {available}")]
+    #[error(
+        "Insufficient data for prediction: need at least {required} samples, have {available}"
+    )]
     InsufficientData { required: usize, available: usize },
 
     /// Resource exhausted.
     #[error("Resource exhausted: {resource}")]
     ResourceExhausted { resource: String },
+
+    /// Deduplication operation failed.
+    #[error("Deduplication failed: {reason}")]
+    DedupFailed { reason: String },
 
     /// I/O error.
     #[error("I/O error: {0}")]

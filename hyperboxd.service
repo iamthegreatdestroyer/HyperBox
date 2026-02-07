@@ -1,0 +1,52 @@
+[Unit]
+Description=HyperBox Container Optimization Daemon
+Documentation=https://github.com/sgbillings/HyperBox
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=hyperboxd.socket
+
+[Service]
+Type=notify
+User=hyperbox
+Group=hyperbox
+
+# Security hardening
+NoNewPrivileges=no
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/hyperbox /etc/hyperbox
+
+# Capabilities for container management
+AmbientCapabilities=CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_NET_ADMIN CAP_SYS_RESOURCE
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_NET_ADMIN CAP_SYS_RESOURCE
+
+# Execution
+ExecStartPre=/usr/bin/mkdir -p /var/lib/hyperbox /etc/hyperbox
+ExecStart=/usr/local/bin/hyperboxd \
+    --config=/etc/hyperbox/hyperbox.toml \
+    --log-level=info
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=0
+StartLimitBurst=0
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hyperboxd
+
+# Resource limits
+MemoryLimit=1G
+CPUQuota=200%
+TasksMax=256
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -59,49 +59,163 @@ impl TimeFeatures {
     }
 }
 
-/// Image usage model.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+/// Image usage model with multi-signal prediction.
+///
+/// Combines decay-weighted temporal frequencies, recency,
+/// trend detection, and session-duration importance into
+/// a single fused prediction score.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ImageModel {
-    /// Hourly usage counts [day][hour].
+    /// Hourly usage counts [day_of_week][hour].
     hourly_counts: [[u64; TIME_BUCKETS]; DAY_BUCKETS],
-    /// Total usage count.
+    /// Exponentially decay-weighted hourly counts.
+    #[serde(default)]
+    decay_weights: [[f64; TIME_BUCKETS]; DAY_BUCKETS],
+    /// Total lifetime usage count.
     total_count: u64,
-    /// Average duration.
+    /// Running average duration in seconds.
     avg_duration: f64,
-    /// Last used.
+    /// Most recent usage timestamp.
     last_used: Option<DateTime<Utc>>,
+    /// Recent inter-arrival intervals (seconds) for trend detection.
+    #[serde(default)]
+    recent_intervals: Vec<f64>,
+    /// Usage trend indicator (−1.0 = falling, +1.0 = rising).
+    #[serde(default)]
+    usage_trend: f64,
+    /// Per-day decay factor (applied each elapsed day).
+    #[serde(default = "default_decay_lambda")]
+    decay_lambda: f64,
+}
+
+fn default_decay_lambda() -> f64 {
+    0.95
+}
+
+impl Default for ImageModel {
+    fn default() -> Self {
+        Self {
+            hourly_counts: [[0; TIME_BUCKETS]; DAY_BUCKETS],
+            decay_weights: [[0.0; TIME_BUCKETS]; DAY_BUCKETS],
+            total_count: 0,
+            avg_duration: 0.0,
+            last_used: None,
+            recent_intervals: Vec::new(),
+            usage_trend: 0.0,
+            decay_lambda: 0.95,
+        }
+    }
 }
 
 impl ImageModel {
+    /// Record a usage event, updating all model signals.
     fn record(&mut self, event: &UsageEvent) {
         let features = TimeFeatures::from_datetime(event.timestamp);
-        self.hourly_counts[features.day_of_week as usize][features.hour as usize] += 1;
+        let d = features.day_of_week as usize;
+        let h = features.hour as usize;
+
+        // ── Raw frequency count ──
+        self.hourly_counts[d][h] += 1;
         self.total_count += 1;
 
-        // Update running average of duration
+        // ── Running average duration ──
         let n = self.total_count as f64;
         self.avg_duration = (self.avg_duration * (n - 1.0) + event.duration_seconds as f64) / n;
+
+        // ── Decay-weighted counts ──
+        // Apply exponential decay to ALL existing weights proportional to
+        // the time elapsed since the last event, then increment current slot.
+        if let Some(last) = self.last_used {
+            let elapsed_days = (event.timestamp - last).num_hours().max(0) as f64 / 24.0;
+            let decay = self.decay_lambda.powf(elapsed_days);
+            for row in self.decay_weights.iter_mut() {
+                for w in row.iter_mut() {
+                    *w *= decay;
+                }
+            }
+        }
+        self.decay_weights[d][h] += 1.0;
+
+        // ── Inter-arrival intervals & trend ──
+        if let Some(last) = self.last_used {
+            let interval = (event.timestamp - last).num_seconds().max(0) as f64;
+            self.recent_intervals.push(interval);
+            // Keep a sliding window of the 50 most recent intervals.
+            if self.recent_intervals.len() > 50 {
+                self.recent_intervals.remove(0);
+            }
+            self.usage_trend = self.compute_trend();
+        }
+
         self.last_used = Some(event.timestamp);
     }
 
+    /// Compute a simple split-half trend from recent inter-arrival times.
+    ///
+    /// Returns a value in [−1.0, 1.0]:
+    ///   positive → intervals are shrinking → usage is *accelerating*
+    ///   negative → intervals are growing   → usage is *decelerating*
+    fn compute_trend(&self) -> f64 {
+        let n = self.recent_intervals.len();
+        if n < 3 {
+            return 0.0;
+        }
+        let mid = n / 2;
+        let first_avg: f64 = self.recent_intervals[..mid].iter().sum::<f64>() / mid as f64;
+        let second_avg: f64 = self.recent_intervals[mid..].iter().sum::<f64>() / (n - mid) as f64;
+        if first_avg == 0.0 {
+            return 0.0;
+        }
+        ((first_avg - second_avg) / first_avg).clamp(-1.0, 1.0)
+    }
+
+    /// Multi-signal prediction combining temporal frequency, recency,
+    /// trend, and duration-importance into a single 0.0–1.0 score.
     fn predict_probability(&self, dt: DateTime<Utc>) -> f64 {
         if self.total_count < MIN_SAMPLES as u64 {
             return 0.0;
         }
 
         let features = TimeFeatures::from_datetime(dt);
-        let hour_count = self.hourly_counts[features.day_of_week as usize][features.hour as usize];
+        let d = features.day_of_week as usize;
+        let h = features.hour as usize;
 
-        // Simple probability based on historical frequency
-        let max_count = self
-            .hourly_counts
+        // ── Signal 1 (weight 0.45): Decay-weighted temporal frequency ──
+        let decay_w = self.decay_weights[d][h];
+        let max_decay = self
+            .decay_weights
             .iter()
             .flat_map(|row| row.iter())
-            .max()
-            .copied()
-            .unwrap_or(1);
+            .cloned()
+            .fold(0.0_f64, f64::max)
+            .max(1.0);
+        let temporal_score = (decay_w / max_decay).min(1.0);
 
-        hour_count as f64 / max_count as f64
+        // ── Signal 2 (weight 0.25): Recency ──
+        // Exponential decay with a ~12-hour half-life.
+        let recency_score = self
+            .last_used
+            .map(|last| {
+                let hours_since = (dt - last).num_hours().max(0) as f64;
+                (-hours_since / 17.3).exp() // half-life ≈ 12 h
+            })
+            .unwrap_or(0.0);
+
+        // ── Signal 3 (weight 0.15): Trend ──
+        // Map [-1, 1] → [0, 1] so positive trend (accelerating) → ~1.0.
+        let trend_score = ((self.usage_trend + 1.0) / 2.0).clamp(0.0, 1.0);
+
+        // ── Signal 4 (weight 0.15): Duration-anchored importance ──
+        // Longer average sessions → heavier / more critical workloads.
+        let duration_score = (self.avg_duration / 3600.0).min(1.0); // saturates at 1 h
+
+        // ── Weighted fusion ──
+        let combined = temporal_score * 0.45
+            + recency_score * 0.25
+            + trend_score * 0.15
+            + duration_score * 0.15;
+
+        combined.clamp(0.0, 1.0)
     }
 
     fn get_peak_hours(&self) -> Vec<(u8, u8, u64)> {
@@ -124,12 +238,14 @@ impl ImageModel {
     }
 }
 
-/// Usage predictor.
+/// Usage predictor with multi-signal fusion and project correlation.
 pub struct UsagePredictor {
-    /// Image models.
+    /// Per-image statistical models.
     models: DashMap<String, ImageModel>,
-    /// Recent events.
+    /// Recent event history per image.
     history: DashMap<String, VecDeque<UsageEvent>>,
+    /// Project → images mapping for correlation boosting.
+    project_images: DashMap<String, Vec<String>>,
     /// Data directory.
     data_dir: PathBuf,
     /// Total predictions made.
@@ -142,6 +258,7 @@ impl UsagePredictor {
         Self {
             models: DashMap::new(),
             history: DashMap::new(),
+            project_images: DashMap::new(),
             data_dir: data_dir.into(),
             predictions_made: AtomicU64::new(0),
         }
@@ -166,15 +283,26 @@ impl UsagePredictor {
         Ok(())
     }
 
-    /// Record a usage event.
+    /// Record a usage event, updating model, history, and project correlations.
     pub fn record(&self, event: UsageEvent) {
         let image_key = event.image.clone();
 
-        // Update model
+        // Update image model
         self.models
             .entry(image_key.clone())
             .or_default()
             .record(&event);
+
+        // Track project → image correlation
+        if let Some(ref project) = event.project_id {
+            let mut images = self
+                .project_images
+                .entry(project.clone())
+                .or_insert_with(Vec::new);
+            if !images.contains(&image_key) {
+                images.push(image_key.clone());
+            }
+        }
 
         // Add to history
         self.history
@@ -198,6 +326,36 @@ impl UsagePredictor {
             .get(image)
             .map(|m| m.predict_probability(at))
             .unwrap_or(0.0)
+    }
+
+    /// Predict with project context — boosts co-used images.
+    pub fn predict_with_context(
+        &self,
+        image: &str,
+        at: DateTime<Utc>,
+        active_project: Option<&str>,
+    ) -> f64 {
+        let base = self.predict(image, at);
+
+        // If a project is active and historically uses this image, apply a
+        // correlation boost (capped at +20 percentage-points).
+        if let Some(project) = active_project {
+            if let Some(images) = self.project_images.get(project) {
+                if images.contains(&image.to_string()) {
+                    return (base + 0.20).min(1.0);
+                }
+            }
+        }
+
+        base
+    }
+
+    /// Get images historically correlated with a project.
+    pub fn project_correlated_images(&self, project: &str) -> Vec<String> {
+        self.project_images
+            .get(project)
+            .map(|v| v.clone())
+            .unwrap_or_default()
     }
 
     /// Predict usage probability for the next N minutes.

@@ -1,0 +1,28 @@
+[Unit]
+Description=HyperBox Daemon Socket
+Documentation=https://github.com/sgbillings/HyperBox
+Before=hyperboxd.service
+
+[Socket]
+# Listen on TCP port 9999
+ListenStream=0.0.0.0:9999
+ListenStream=[::]:9999
+
+# Unix socket for local communication
+ListenStream=/var/run/hyperbox.sock
+
+# Socket options
+Accept=no
+NoDelay=yes
+ReusePort=yes
+
+# Directory and file creation
+DirectoryMode=0755
+SocketMode=0666
+
+# Buffer sizes
+ReceiveBufferSize=2M
+SendBufferSize=2M
+
+[Install]
+WantedBy=sockets.target

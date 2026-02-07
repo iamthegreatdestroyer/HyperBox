@@ -1,0 +1,457 @@
+# Kubernetes Deployment Manifests for HyperBox
+# Complete stack including DaemonSet, ConfigMap, RBAC, and monitoring
+
+---
+# ============================================================================
+# Namespace
+# ============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hyperbox
+  labels:
+    app: hyperbox
+
+---
+# ============================================================================
+# ServiceAccount for HyperBox
+# ============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hyperbox
+  namespace: hyperbox
+  labels:
+    app: hyperbox
+
+---
+# ============================================================================
+# ClusterRole: Container Management Permissions
+# ============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hyperbox
+  labels:
+    app: hyperbox
+rules:
+  # Container runtime access (if using containerd or CRI)
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+
+  # Pod access for optimization
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # ConfigMap access
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Events for monitoring
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+# ============================================================================
+# ClusterRoleBinding: Bind ServiceAccount to ClusterRole
+# ============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hyperbox
+  labels:
+    app: hyperbox
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hyperbox
+subjects:
+  - kind: ServiceAccount
+    name: hyperbox
+    namespace: hyperbox
+
+---
+# ============================================================================
+# ConfigMap: HyperBox Configuration
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hyperbox-config
+  namespace: hyperbox
+  labels:
+    app: hyperbox
+data:
+  hyperbox.toml: |
+    # HyperBox Daemon Configuration
+
+    [daemon]
+    listen_addr = "0.0.0.0:9999"
+    data_dir = "/var/lib/hyperbox"
+    log_level = "info"
+
+    [cache]
+    # Cache size in MB
+    size_mb = 512
+    # TTL in seconds
+    ttl_seconds = 3600
+    # Enable compression
+    compression = true
+
+    [deduplication]
+    # Enable layer deduplication
+    enabled = true
+    # Hash algorithm: "sha256" or "blake3"
+    hash_algorithm = "blake3"
+    # Minimum layer size for dedup (bytes)
+    min_layer_size = 1048576
+
+    [prediction]
+    # Enable access pattern prediction
+    enabled = true
+    # Model update interval (seconds)
+    update_interval = 300
+    # Minimum confidence for prediction
+    min_confidence = 0.6
+    # Maximum predictions per container
+    max_predictions = 10
+
+    [prewarming]
+    # Enable eager loading
+    enabled = true
+    # Number of parallel warm-up operations
+    parallel_ops = 4
+    # Timeout for warm-up (seconds)
+    timeout_seconds = 30
+
+    [monitoring]
+    # Enable prometheus metrics
+    metrics_enabled = true
+    # Metrics port (relative to daemon port)
+    metrics_port = 8888
+    # Metrics collection interval (seconds)
+    collection_interval = 10
+
+  optimization_policy.yaml: |
+    # Default Optimization Policy
+    apiVersion: hyperbox.io/v1
+    kind: OptimizationPolicy
+    metadata:
+      name: default
+    spec:
+      # Container selection
+      selector:
+        matchLabels: {}
+
+      # Memory targets
+      memory:
+        target_reduction_percent: 30
+        min_savings_mb: 10
+
+      # Startup optimization
+      startup:
+        enabled: true
+        target_improvement_percent: 40
+
+      # Layer deduplication
+      deduplication:
+        enabled: true
+        target_rate_percent: 20
+
+      # Prediction
+      prediction:
+        enabled: true
+        min_accuracy_threshold: 0.65
+
+---
+# ============================================================================
+# DaemonSet: HyperBox Daemon
+# ============================================================================
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hyperboxd
+  namespace: hyperbox
+  labels:
+    app: hyperbox
+spec:
+  selector:
+    matchLabels:
+      app: hyperbox
+
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+  template:
+    metadata:
+      labels:
+        app: hyperbox
+        version: v0.1.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8888"
+        prometheus.io/path: "/metrics"
+
+    spec:
+      # Use host PID namespace for container management
+      hostPID: true
+      hostNetwork: false
+
+      # Tolerations for all node types
+      tolerations:
+        - operator: "Exists"
+
+      # Service account
+      serviceAccountName: hyperbox
+
+      # Security context
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+
+      # Init containers for setup
+      initContainers:
+        - name: setup
+          image: hyperbox:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              mkdir -p /var/lib/hyperbox
+              mkdir -p /etc/hyperbox
+              chmod 755 /var/lib/hyperbox
+          volumeMounts:
+            - name: hyperbox-data
+              mountPath: /var/lib/hyperbox
+
+      containers:
+        # Main HyperBox daemon
+        - name: hyperboxd
+          image: hyperbox:latest
+          imagePullPolicy: IfNotPresent
+
+          # Command and args
+          command: ["/usr/local/bin/hyperboxd"]
+          args:
+            - "--config=/etc/hyperbox/hyperbox.toml"
+            - "--log-level=info"
+
+          # Security context
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+                - SYS_PTRACE
+                - NET_ADMIN
+                - SYS_RESOURCE
+
+          # Port configuration
+          ports:
+            - name: daemon
+              containerPort: 9999
+              hostPort: 9999
+              protocol: TCP
+            - name: metrics
+              containerPort: 8888
+              hostPort: 8888
+              protocol: TCP
+
+          # Environment variables
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: RUST_LOG
+              value: "info,hyperbox_core=debug,hyperbox_daemon=debug"
+            - name: HYPERBOX_DATA_DIR
+              value: "/var/lib/hyperbox"
+            - name: HYPERBOX_CONFIG_DIR
+              value: "/etc/hyperbox"
+
+          # Resource requests and limits
+          resources:
+            requests:
+              cpu: 500m
+              memory: 256Mi
+            limits:
+              cpu: 2
+              memory: 1Gi
+
+          # Probes
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8888
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8888
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Volume mounts
+          volumeMounts:
+            - name: hyperbox-config
+              mountPath: /etc/hyperbox
+              readOnly: true
+            - name: hyperbox-data
+              mountPath: /var/lib/hyperbox
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+            - name: containerd-sock
+              mountPath: /var/run/containerd
+            - name: crio-sock
+              mountPath: /var/run/crio
+
+      # Volumes
+      volumes:
+        - name: hyperbox-config
+          configMap:
+            name: hyperbox-config
+        - name: hyperbox-data
+          hostPath:
+            path: /var/lib/hyperbox
+            type: DirectoryOrCreate
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
+        - name: containerd-sock
+          hostPath:
+            path: /var/run/containerd
+            type: DirectoryOrCreate
+        - name: crio-sock
+          hostPath:
+            path: /var/run/crio
+            type: DirectoryOrCreate
+
+---
+# ============================================================================
+# Service: HyperBox Daemon
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: hyperboxd
+  namespace: hyperbox
+  labels:
+    app: hyperbox
+spec:
+  type: ClusterIP
+  ports:
+    - name: daemon
+      port: 9999
+      targetPort: 9999
+      protocol: TCP
+    - name: metrics
+      port: 8888
+      targetPort: 8888
+      protocol: TCP
+  selector:
+    app: hyperbox
+
+---
+# ============================================================================
+# ServiceMonitor: Prometheus Integration
+# ============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hyperbox
+  namespace: hyperbox
+  labels:
+    app: hyperbox
+spec:
+  selector:
+    matchLabels:
+      app: hyperbox
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+
+---
+# ============================================================================
+# HorizontalPodAutoscaler: For optional deployment (not DaemonSet)
+# ============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hyperbox-hpa
+  namespace: hyperbox
+  labels:
+    app: hyperbox
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hyperbox  # If using Deployment instead of DaemonSet
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# ============================================================================
+# NetworkPolicy: Restrict Network Access
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hyperbox
+  namespace: hyperbox
+  labels:
+    app: hyperbox
+spec:
+  podSelector:
+    matchLabels:
+      app: hyperbox
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: hyperbox
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9999
+        - protocol: TCP
+          port: 8888
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

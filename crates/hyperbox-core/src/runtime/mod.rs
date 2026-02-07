@@ -9,6 +9,7 @@
 //! - **crun**: Recommended on Linux for best performance
 //! - **youki**: Rust-based alternative on Linux
 //! - **runc**: Reference OCI runtime
+//! - **wasmtime**: WebAssembly workloads via Wasmtime CLI
 //!
 //! # Cross-Platform Architecture
 //!
@@ -22,6 +23,8 @@ mod crun;
 mod docker;
 mod registry;
 mod traits;
+#[cfg(feature = "wasm")]
+mod wasm;
 #[cfg(feature = "youki")]
 mod youki;
 
@@ -29,6 +32,8 @@ pub use crun::CrunRuntime;
 pub use docker::DockerRuntime;
 pub use registry::RuntimeRegistry;
 pub use traits::{ContainerRuntime, ImageInfo, ProcessInfo};
+#[cfg(feature = "wasm")]
+pub use wasm::WasmRuntime;
 #[cfg(feature = "youki")]
 pub use youki::YoukiRuntime;
 
@@ -49,6 +54,8 @@ pub enum RuntimeType {
     Runc,
     /// Firecracker - microVM-based isolation (Linux)
     Firecracker,
+    /// Wasmtime - WebAssembly workloads via Wasmtime CLI
+    Wasm,
 }
 
 impl RuntimeType {
@@ -61,6 +68,7 @@ impl RuntimeType {
             Self::Youki => "youki",
             Self::Runc => "runc",
             Self::Firecracker => "firecracker",
+            Self::Wasm => "wasmtime",
         }
     }
 
@@ -73,6 +81,15 @@ impl RuntimeType {
                 // Docker is accessed via API, not binary path
                 PathBuf::from("/var/run/docker.sock"),
                 PathBuf::from("//./pipe/docker_engine"),
+            ],
+            Self::Wasm => vec![
+                PathBuf::from("/usr/bin/wasmtime"),
+                PathBuf::from("/usr/local/bin/wasmtime"),
+                PathBuf::from(format!(
+                    "{}/.wasmtime/bin/wasmtime",
+                    std::env::var("HOME").unwrap_or_default()
+                )),
+                PathBuf::from("C:\\Program Files\\Wasmtime\\bin\\wasmtime.exe"),
             ],
             _ => vec![
                 PathBuf::from(format!("/usr/bin/{binary}")),
@@ -90,6 +107,7 @@ impl RuntimeType {
             Self::Docker => true, // Docker works everywhere
             Self::Crun | Self::Youki | Self::Runc => cfg!(unix),
             Self::Firecracker => cfg!(target_os = "linux"),
+            Self::Wasm => true, // WASM runs on all platforms
         }
     }
 
@@ -112,6 +130,7 @@ impl std::fmt::Display for RuntimeType {
             Self::Youki => write!(f, "youki"),
             Self::Runc => write!(f, "runc"),
             Self::Firecracker => write!(f, "firecracker"),
+            Self::Wasm => write!(f, "wasm"),
         }
     }
 }

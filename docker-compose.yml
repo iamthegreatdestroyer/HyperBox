@@ -1,0 +1,195 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # HyperBox Daemon Service
+  # ============================================================================
+  hyperboxd:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hyperbox:latest
+    container_name: hyperboxd
+
+    # Capabilities for container management
+    cap_add:
+      - SYS_ADMIN
+      - SYS_PTRACE
+      - NET_ADMIN
+
+    # Security options
+    security_opt:
+      - apparmor=unconfined
+      - seccomp=unconfined
+
+    # Volume mounts
+    volumes:
+      # Docker socket for container management
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # Data directory for optimization cache
+      - hyperbox_data:/var/lib/hyperbox
+
+      # Configuration directory
+      - ./config:/etc/hyperbox:ro
+
+    # Environment variables
+    environment:
+      # Logging configuration
+      RUST_LOG: info,hyperbox_core=debug,hyperbox_daemon=debug
+      RUST_BACKTRACE: '1'
+
+      # Daemon configuration
+      HYPERBOX_LISTEN_ADDR: '0.0.0.0:9999'
+      HYPERBOX_DATA_DIR: '/var/lib/hyperbox'
+      HYPERBOX_CONFIG_DIR: '/etc/hyperbox'
+
+      # Performance tuning
+      HYPERBOX_CACHE_SIZE_MB: '512'
+      HYPERBOX_MAX_PARALLEL_OPS: '4'
+      HYPERBOX_PREDICTION_ENABLED: 'true'
+      HYPERBOX_DEDUP_ENABLED: 'true'
+      HYPERBOX_PREWARMING_ENABLED: 'true'
+
+    # Port mappings
+    ports:
+      - "9999:9999"
+
+    # Resource constraints
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Healthcheck
+    healthcheck:
+      test: ["CMD", "hb", "health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================================
+  # Prometheus for Metrics Collection
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: hyperbox-prometheus
+
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+    environment:
+      -  PROMETHEUS_ENABLE_LIFECYCLE=true
+
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+
+    ports:
+      - "9090:9090"
+
+    depends_on:
+      - hyperboxd
+
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # ============================================================================
+  # Grafana for Visualization
+  # ============================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: hyperbox-grafana
+
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_INSTALL_PLUGINS: 'grafana-worldmap-panel'
+
+    ports:
+      - "3000:3000"
+
+    depends_on:
+      - prometheus
+
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ============================================================================
+  # PostgreSQL for Metrics Storage (Optional)
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: hyperbox-postgres
+
+    environment:
+      POSTGRES_DB: hyperbox_metrics
+      POSTGRES_USER: hyperbox
+      POSTGRES_PASSWORD: hyperbox_dev_password
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+    ports:
+      - "5432:5432"
+
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hyperbox"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# ============================================================================
+# Volume Definitions
+# ============================================================================
+volumes:
+  hyperbox_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+# ============================================================================
+# Network
+# ============================================================================
+networks:
+  default:
+    name: hyperbox_network
+    driver: bridge
