@@ -11,15 +11,17 @@
 pub mod criu;
 pub mod error;
 pub mod lazy_load;
-pub mod prewarm;
+pub mod nydus;
 pub mod predict;
+pub mod prewarm;
 
 // Re-exports
 pub use criu::CriuManager;
 pub use error::{OptimizeError, Result};
 pub use lazy_load::LazyLayerLoader;
-pub use prewarm::PrewarmManager;
+pub use nydus::NydusManager;
 pub use predict::UsagePredictor;
+pub use prewarm::PrewarmManager;
 
 /// Performance metrics for optimization.
 #[derive(Debug, Clone, Default)]
@@ -71,7 +73,7 @@ impl PerformanceMetrics {
 /// Prelude for common imports.
 pub mod prelude {
     pub use super::{
-        CriuManager, LazyLayerLoader, OptimizeError, PerformanceMetrics, PrewarmManager,
-        Result, UsagePredictor,
+        CriuManager, LazyLayerLoader, NydusManager, OptimizeError, PerformanceMetrics,
+        PrewarmManager, Result, UsagePredictor,
     };
 }

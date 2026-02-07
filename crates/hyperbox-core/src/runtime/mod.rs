@@ -22,11 +22,15 @@ mod crun;
 mod docker;
 mod registry;
 mod traits;
+#[cfg(feature = "youki")]
+mod youki;
 
 pub use crun::CrunRuntime;
 pub use docker::DockerRuntime;
 pub use registry::RuntimeRegistry;
 pub use traits::{ContainerRuntime, ImageInfo, ProcessInfo};
+#[cfg(feature = "youki")]
+pub use youki::YoukiRuntime;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
