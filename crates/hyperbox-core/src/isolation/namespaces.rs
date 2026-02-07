@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::process::Command;
 use crate::error::CoreError;
 
 /// Types of Linux namespaces.

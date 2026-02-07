@@ -1,9 +1,10 @@
 //! CNI (Container Network Interface) integration.
 
-use crate::error::Result;
+use crate::error::{CoreError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use tracing::debug;
 
 /// CNI plugin paths.
