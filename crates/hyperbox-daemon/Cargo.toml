@@ -6,6 +6,10 @@ description = "HyperBox background daemon service"
 license = "MIT OR Apache-2.0"
 authors = ["HyperBox Contributors"]
 
+[lib]
+name = "hyperbox_daemon"
+path = "src/lib.rs"
+
 [[bin]]
 name = "hyperboxd"
 path = "src/main.rs"

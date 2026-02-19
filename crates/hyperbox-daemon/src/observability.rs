@@ -12,7 +12,9 @@
 //! Collection: Rolling 10-minute window
 
 pub mod ebpf;
+pub mod span_generator;
 
 pub use ebpf::{
     eBPFTracer, NetworkTrace, SyscallTrace, format_ipv4, parse_ipv4, syscall_id_to_name,
 };
+pub use span_generator::{SpanGenerator, SpanContext, SpanStatus, SpanEvent, SyscallAttributes, NetworkAttributes};
