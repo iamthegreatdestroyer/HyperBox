@@ -19,6 +19,7 @@ pub mod memory;
 pub mod nydus;
 pub mod predict;
 pub mod prewarm;
+pub mod storage;
 
 // Re-exports
 pub use criu::CriuManager;
@@ -30,6 +31,7 @@ pub use memory::DynamicMemoryManager;
 pub use nydus::NydusManager;
 pub use predict::UsagePredictor;
 pub use prewarm::PrewarmManager;
+pub use storage::{MountManager, MountHandle, MountStats, ErofsPerformanceMetrics, CacheStatistics};
 
 /// Performance metrics for optimization.
 #[derive(Debug, Clone, Default)]
