@@ -45,6 +45,11 @@ reqwest = { version = "0.11", features = ["json", "stream"] }
 which = "6.0"
 tempfile = "3.9"
 
+# Archive handling
+tar = "0.4"
+flate2 = "1.0"
+anyhow = "1.0"
+
 [dev-dependencies]
 tokio-test = "0.4"
 criterion = "0.5"

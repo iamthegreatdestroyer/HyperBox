@@ -69,6 +69,9 @@ async fn main() -> Result<()> {
     // Initialize daemon state
     let state = DaemonState::new(config.clone()).await?;
 
+    // Start PSI memory monitor
+    state.start_psi_monitor();
+
     // Start services
     let api_handle = tokio::spawn(api::serve(state.clone(), config.api_socket.clone()));
     let grpc_handle = tokio::spawn(grpc::serve(state.clone(), config.grpc_addr.clone()));

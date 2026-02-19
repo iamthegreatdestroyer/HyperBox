@@ -4,6 +4,7 @@ use crate::config::DaemonConfig;
 use crate::error::{DaemonError, Result};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
+use hyperbox_core::memory::PSIMonitor;
 use hyperbox_core::runtime::{ContainerRuntime, DockerRuntime};
 use hyperbox_optimize::criu::CriuManager;
 use hyperbox_optimize::lazy_load::LazyLayerLoader;
@@ -329,6 +330,72 @@ impl DaemonState {
             .filter(|c| c.status == ContainerStatus::Running)
             .map(|c| c.clone())
             .collect()
+    }
+
+    /// Start PSI (Pressure Stall Information) memory monitor background task.
+    ///
+    /// This spawns a background task that:
+    /// - Reads kernel memory pressure metrics every 10 seconds
+    /// - Detects critical and warning threshold breaches
+    /// - Automatically tunes swap (swappiness) based on memory pressure
+    ///
+    /// The monitor gracefully handles unsupported kernels (< Linux 5.0)
+    /// and missing privileges for swap tuning.
+    pub fn start_psi_monitor(&self) {
+        let monitor_result = PSIMonitor::new();
+
+        if monitor_result.is_err() {
+            eprintln!("⚠️  Failed to initialize PSI monitor: {:?}", monitor_result);
+            return;
+        }
+
+        let mut monitor = monitor_result.unwrap();
+
+        if !monitor.is_enabled() {
+            eprintln!("ℹ️  PSI monitoring disabled (kernel < 5.0 or unsupported platform)");
+            return;
+        }
+
+        eprintln!("✅ PSI memory monitor started");
+
+        tokio::spawn(async move {
+            loop {
+                // Update PSI readings every 10 seconds
+                match monitor.update().await {
+                    Ok(()) => {
+                        if let Some(reading) = monitor.current() {
+                            eprintln!(
+                                "📊 PSI: some={:.1}% full={:.1}%",
+                                reading.some, reading.full
+                            );
+
+                            // Check pressure levels and log accordingly
+                            if monitor.is_critical() {
+                                eprintln!(
+                                    "🔴 CRITICAL memory pressure detected! (full={:.1}%)",
+                                    reading.full
+                                );
+
+                                // Trigger swap tuning
+                                if let Err(e) = monitor.tune_swap().await {
+                                    eprintln!("⚠️  Swap tuning failed: {}", e);
+                                }
+                            } else if monitor.is_warning() {
+                                eprintln!(
+                                    "🟡 WARNING memory pressure detected! (full={:.1}%)",
+                                    reading.full
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("❌ PSI update failed: {}", e);
+                    }
+                }
+
+                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+            }
+        });
     }
 }
 

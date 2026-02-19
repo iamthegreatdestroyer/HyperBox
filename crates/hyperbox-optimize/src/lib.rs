@@ -6,11 +6,13 @@
 //! - **CRIU Integration**: Checkpoint/restore for <100ms warm starts
 //! - **Lazy Layer Loading**: eStargz for on-demand file access
 //! - **FastCDC Deduplication**: Content-defined chunking with bloom filter dedup
+//! - **EROFS + fscache**: Read-only compressed filesystem with 30-50% faster pulls on Linux 5.19+
 //! - **Predictive Pre-warming**: ML-based container pre-warming
 //! - **Usage Prediction**: Pattern recognition for resource optimization
 
 pub mod criu;
 pub mod dedup;
+pub mod erofs;
 pub mod error;
 pub mod lazy_load;
 pub mod memory;
@@ -22,6 +24,7 @@ pub mod prewarm;
 pub use criu::CriuManager;
 pub use dedup::ChunkDeduplicator;
 pub use error::{OptimizeError, Result};
+pub use erofs::{EROFSManager, EROFSMetrics, EROFSImage, EROFSMount};
 pub use lazy_load::LazyLayerLoader;
 pub use memory::DynamicMemoryManager;
 pub use nydus::NydusManager;
@@ -78,7 +81,8 @@ impl PerformanceMetrics {
 /// Prelude for common imports.
 pub mod prelude {
     pub use super::{
-        ChunkDeduplicator, CriuManager, DynamicMemoryManager, LazyLayerLoader, NydusManager,
-        OptimizeError, PerformanceMetrics, PrewarmManager, Result, UsagePredictor,
+        ChunkDeduplicator, CriuManager, DynamicMemoryManager, EROFSManager, EROFSMetrics,
+        LazyLayerLoader, NydusManager, OptimizeError, PerformanceMetrics, PrewarmManager, Result,
+        UsagePredictor,
     };
 }

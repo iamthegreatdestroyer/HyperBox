@@ -51,9 +51,9 @@ services:
       HYPERBOX_DEDUP_ENABLED: 'true'
       HYPERBOX_PREWARMING_ENABLED: 'true'
 
-    # Port mappings
+    # Port mappings (Updated: 9999 → 15999 for HyperBox project range)
     ports:
-      - "9999:9999"
+      - "15999:9999"
 
     # Resource constraints
     deploy:
@@ -95,7 +95,7 @@ services:
       - '--web.enable-lifecycle'
 
     ports:
-      - "9090:9090"
+      - "15090:9090"  # Updated: 9090 → 15090 for HyperBox project range
 
     depends_on:
       - hyperboxd
@@ -126,7 +126,7 @@ services:
       GF_INSTALL_PLUGINS: 'grafana-worldmap-panel'
 
     ports:
-      - "3000:3000"
+      - "15000:3000"  # Updated: 3000 → 15000 for HyperBox project range
 
     depends_on:
       - prometheus
@@ -155,7 +155,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
     ports:
-      - "5432:5432"
+      - "15432:5432"  # Updated: 5432 → 15432 for HyperBox project range
 
     restart: unless-stopped
 

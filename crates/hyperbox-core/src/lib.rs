@@ -33,6 +33,7 @@
 
 pub mod error;
 pub mod isolation;
+pub mod memory;
 pub mod network;
 pub mod runtime;
 pub mod storage;
