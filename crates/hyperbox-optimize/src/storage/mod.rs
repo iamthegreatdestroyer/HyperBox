@@ -6,7 +6,9 @@
 pub mod erofs;
 pub mod erofs_advanced;
 pub mod erofs_mount;
+pub mod fscache_manager;
 
 pub use erofs::ErofsBackend;
 pub use erofs_advanced::{ErofsPerformanceMetrics, CacheStatistics, BenchmarkResult, FallbackStrategy};
 pub use erofs_mount::{MountManager, MountHandle, MountStats, MountInfo, MountOptions};
+pub use fscache_manager::{FscacheManager, CacheBackend, CacheBinding, EvictionPolicy, CacheStats};
