@@ -19,6 +19,7 @@ pub mod memory;
 pub mod nydus;
 pub mod predict;
 pub mod prewarm;
+pub mod profile_exporter;
 pub mod storage;
 
 // Re-exports
@@ -31,6 +32,7 @@ pub use memory::DynamicMemoryManager;
 pub use nydus::NydusManager;
 pub use predict::UsagePredictor;
 pub use prewarm::PrewarmManager;
+pub use profile_exporter::{ProfileExporter, SecurityProfile, SyscallProfile, ProfileFormat, SyscallAction, Architecture};
 pub use storage::{MountManager, MountHandle, MountStats, ErofsPerformanceMetrics, CacheStatistics};
 
 /// Performance metrics for optimization.
