@@ -5,5 +5,7 @@
 //! system swappiness based on real-time memory demand.
 
 pub mod psi;
+pub mod psi_performance;
 
 pub use psi::{PSIMemory, PSIMonitor, SwapTuner};
+pub use psi_performance::{PSIMetrics, PSIPerformanceMonitor, CachedReading};
