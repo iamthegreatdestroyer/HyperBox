@@ -1,0 +1,75 @@
+{
+  "chat.autopilot.enabled": true,
+  "github.copilot.chat.cli.terminalLinks.enabled": true,
+  "chat.useCustomizationsInParentRepositories": true,
+  "chat.agent.enabled": true,
+  "chat.useAgentSkills": true,
+  "chat.imageCarousel.enabled": true,
+  "imageCarousel.explorerContextMenu.enabled": true,
+  "github.copilot.chat.agent.thinkingProcess": true,
+  "github.copilot.chat.scopeSelection": true,
+  "chat.tools.terminal.enableAutoApprove": true,
+  "chat.restoreLastPanelSession": false,
+  "claudeCodeChat.permissions.yoloMode": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "rust-lang.rust-analyzer",
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.rulers": [100],
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": "active",
+  "editor.stickyScroll.enabled": true,
+  "editor.minimap.enabled": false,
+  "editor.cursorBlinking": "smooth",
+  "editor.cursorSmoothCaretAnimation": "on",
+  "editor.inlineSuggest.enabled": true,
+  "editor.quickSuggestions": { "other": true, "comments": true, "strings": true },
+  "editor.largeFileOptimizations": true,
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true
+  },
+  "rust-analyzer.checkOnSave.command": "clippy",
+  "rust-analyzer.inlayHints.parameterHints.enable": true,
+  "rust-analyzer.inlayHints.typeHints.enable": true,
+  "rust-analyzer.inlayHints.chainingHints.enable": true,
+  "rust-analyzer.procMacro.enable": true,
+  "rust-analyzer.cargo.buildScripts.enable": true,
+  "github.copilot.enable": { "*": true, "yaml": true, "markdown": true, "plaintext": false },
+  "files.exclude": {
+    "**/.git": true,
+    "**/target": true,
+    "**/node_modules": true
+  },
+  "search.exclude": {
+    "**/target": true,
+    "**/node_modules": true
+  },
+  "files.watcherExclude": {
+    "**/target/**": true,
+    "**/node_modules/**": true
+  },
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.fontSize": 13,
+  "terminal.integrated.scrollback": 10000,
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "Cargo.toml": "Cargo.lock, .cargo, rust-toolchain.toml",
+    "*.rs": "${capture}.test.rs",
+    "README.md": "CONTRIBUTING.md, LICENSE, CHANGELOG.md"
+  },
+  "files.associations": {
+    "*.agent.md": "markdown",
+    "SKILL.md": "markdown",
+    "copilot-instructions.md": "markdown"
+  },
+  "errorLens.enabled": true,
+  "errorLens.enabledDiagnosticLevels": ["error", "warning"],
+  "errorLens.delay": 500,
+  "workbench.editor.enablePreview": false,
+  "breadcrumbs.enabled": true
+}
