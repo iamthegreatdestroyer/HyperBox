@@ -43,7 +43,7 @@ impl AppState {
 
     /// Connect to daemon.
     pub async fn connect_daemon(&self) -> anyhow::Result<()> {
-        let client = DaemonClient::connect("http://127.0.0.1:8080").await?;
+        let client = DaemonClient::connect("http://127.0.0.1:8181").await?;
         *self.daemon.write().await = Some(client);
         Ok(())
     }

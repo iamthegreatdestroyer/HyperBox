@@ -20,13 +20,12 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 /// Serve the REST API.
-pub async fn serve(state: DaemonState, socket_path: PathBuf) -> anyhow::Result<()> {
+pub async fn serve(state: DaemonState, _socket_path: PathBuf, http_addr: std::net::SocketAddr) -> anyhow::Result<()> {
     let app = create_router(state);
 
-    // For now, use TCP. Unix socket support would go here.
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
+    let listener = tokio::net::TcpListener::bind(http_addr).await?;
 
-    info!("REST API listening on http://127.0.0.1:8080");
+    info!("REST API listening on http://{}", http_addr);
 
     axum::serve(listener, app).await?;
 

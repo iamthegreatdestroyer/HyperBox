@@ -5,8 +5,8 @@
 use anyhow::{Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-/// Default daemon HTTP address.
-pub const DEFAULT_DAEMON_ADDR: &str = "http://127.0.0.1:8080";
+/// Default daemon HTTP address (8181 — avoids conflict with Docker Desktop on 8080).
+pub const DEFAULT_DAEMON_ADDR: &str = "http://127.0.0.1:8181";
 
 /// Windows named pipe path for IPC.
 #[cfg(windows)]
@@ -79,8 +79,11 @@ pub struct PortMappingRequest {
 #[derive(Debug, Deserialize)]
 pub struct HealthStatus {
     pub status: String,
+    #[serde(default)]
     pub version: String,
+    #[serde(default)]
     pub uptime_seconds: u64,
+    #[serde(default)]
     pub container_count: usize,
 }
 

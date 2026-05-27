@@ -1018,8 +1018,9 @@ mod tests {
 
     #[test]
     fn test_parse_image_based_config() {
+        let cleaned = strip_jsonc_comments(sample_devcontainer_json());
         let config: DevContainerConfig =
-            serde_json::from_str(sample_devcontainer_json()).expect("parse");
+            serde_json::from_str(&cleaned).expect("parse");
 
         assert_eq!(config.name.as_deref(), Some("Rust Development"));
         assert_eq!(
@@ -1200,8 +1201,9 @@ mod tests {
 
     #[test]
     fn test_resolve_features() {
+        let cleaned = strip_jsonc_comments(sample_devcontainer_json());
         let config: DevContainerConfig =
-            serde_json::from_str(sample_devcontainer_json()).expect("parse");
+            serde_json::from_str(&cleaned).expect("parse");
 
         let mut mgr = DevContainerManager::new("/tmp/test");
         mgr.config = Some(config);
@@ -1215,8 +1217,9 @@ mod tests {
 
     #[test]
     fn test_feature_install_instructions() {
+        let cleaned = strip_jsonc_comments(sample_devcontainer_json());
         let config: DevContainerConfig =
-            serde_json::from_str(sample_devcontainer_json()).expect("parse");
+            serde_json::from_str(&cleaned).expect("parse");
 
         let mut mgr = DevContainerManager::new("/tmp/test");
         mgr.config = Some(config);

@@ -441,7 +441,7 @@ export default function Performance() {
                     className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                   >
                     <td className="px-6 py-3 font-medium text-gray-900 dark:text-white truncate max-w-[200px]">
-                      {c.name || c.id.slice(0, 12)}
+                      {c.containerName || c.id.slice(0, 12)}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">
                       <span

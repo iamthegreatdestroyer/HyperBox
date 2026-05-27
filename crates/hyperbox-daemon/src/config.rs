@@ -15,6 +15,10 @@ pub struct DaemonConfig {
     /// Unix socket path for API
     pub api_socket: PathBuf,
 
+    /// HTTP REST API address (default: 127.0.0.1:8181 — avoids conflict with Docker Desktop on 8080)
+    #[serde(default = "default_http_addr")]
+    pub http_addr: SocketAddr,
+
     /// gRPC server address
     pub grpc_addr: SocketAddr,
 
@@ -128,6 +132,7 @@ impl Default for DaemonConfig {
         Self {
             config_path: default_config_path(),
             api_socket: default_socket_path(),
+            http_addr: "127.0.0.1:8181".parse().unwrap(),
             grpc_addr: "127.0.0.1:50051".parse().unwrap(),
             data_dir: data_dir.clone(),
             log_level: "info".to_string(),
@@ -250,6 +255,10 @@ fn default_config_path() -> PathBuf {
             .join("hyperbox")
             .join("daemon.toml")
     }
+}
+
+fn default_http_addr() -> SocketAddr {
+    "127.0.0.1:8181".parse().unwrap()
 }
 
 fn default_socket_path() -> PathBuf {

@@ -23,10 +23,12 @@
 //!     SecurityStack, SecurityPolicy, SecurityLayerKind,
 //! };
 //!
-//! let stack = SecurityStack::detect();
-//! let policy = SecurityPolicy::default_hardened("/var/lib/hyperbox/containers/abc");
-//! let report = stack.apply(&policy).await.unwrap();
-//! assert!(report.is_usable());
+//! async fn example() {
+//!     let stack = SecurityStack::detect();
+//!     let policy = SecurityPolicy::default_hardened("/var/lib/hyperbox/containers/abc");
+//!     let report = stack.apply(&policy, "container-abc").await.unwrap();
+//!     assert!(report.is_usable());
+//! }
 //! ```
 
 use crate::error::{CoreError, Result};

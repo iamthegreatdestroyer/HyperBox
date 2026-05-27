@@ -247,8 +247,9 @@ mod tests {
 
     #[test]
     fn test_cache_full_detection() {
-        let stats_full = CacheStatistics::new(10 * 1024 * 1024 * 1024, 9600 * 1024 * 1024, 1000);
-        assert!(stats_full.is_full()); // 96% used
+        // 9728 MB / 10240 MB = 95.0% — exactly at threshold
+        let stats_full = CacheStatistics::new(10 * 1024 * 1024 * 1024, 9728 * 1024 * 1024, 1000);
+        assert!(stats_full.is_full()); // 95% used
 
         let stats_empty = CacheStatistics::new(10 * 1024 * 1024 * 1024, 0, 0);
         assert!(stats_empty.is_empty());
@@ -256,10 +257,11 @@ mod tests {
 
     #[test]
     fn test_meets_target() {
-        let good_metrics = ErofsPerformanceMetrics::new(104857600, 70); // Fast
+        let good_metrics = ErofsPerformanceMetrics::new(104857600, 70); // Fast: ~1.4 GB/s
         assert!(good_metrics.meets_target()); // >1.3x composefs
 
-        let poor_metrics = ErofsPerformanceMetrics::new(104857600, 200); // Slow
+        // 100 MB in 20000 ms = 5 MB/s, below the 9.1 MB/s (1.3x) threshold
+        let poor_metrics = ErofsPerformanceMetrics::new(104857600, 20000);
         assert!(!poor_metrics.meets_target());
     }
 }

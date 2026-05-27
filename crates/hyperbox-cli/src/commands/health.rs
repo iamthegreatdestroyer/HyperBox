@@ -43,46 +43,10 @@ pub async fn run(_cmd: HealthCommand) -> Result<()> {
     }
 }
 
-/// Check if HyperBox daemon socket exists and is responsive
+/// Check if HyperBox daemon is responsive via HTTP health endpoint
 async fn check_daemon_socket() -> bool {
-    let socket_paths = vec![
-        PathBuf::from("/run/hyperbox/hyperbox.sock"),
-        PathBuf::from("/var/run/hyperbox/hyperbox.sock"),
-        PathBuf::from("/tmp/hyperbox/hyperbox.sock"),
-    ];
-
-    // Add XDG Runtime Dir path if available
-    let mut paths = socket_paths;
-    if let Some(runtime_dir) = dirs::runtime_dir() {
-        paths.push(runtime_dir.join("hyperbox/hyperbox.sock"));
-    }
-
-    // Add home directory path if available
-    if let Some(home) = dirs::home_dir() {
-        paths.push(home.join(".hyperbox/daemon.sock"));
-    }
-
-    for socket_path in paths {
-        if let Ok(metadata) = fs::metadata(&socket_path) {
-            // On Unix systems, verify it's actually a socket
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::FileTypeExt;
-                if metadata.file_type().is_socket() {
-                    return true;
-                }
-            }
-            // On non-Unix systems, just check if the path exists and is a file
-            #[cfg(not(unix))]
-            {
-                if metadata.is_file() {
-                    return true;
-                }
-            }
-        }
-    }
-
-    false
+    use crate::client::DaemonClient;
+    DaemonClient::new().is_running().await
 }
 
 /// Check if crun binary is available and executable

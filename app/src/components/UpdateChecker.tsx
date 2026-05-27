@@ -169,6 +169,7 @@ export default function UpdateChecker() {
           <div className="mt-3 flex gap-2">
             {state === "available" && (
               <button
+                type="button"
                 onClick={installUpdate}
                 className="btn btn-sm btn-primary"
               >
@@ -178,6 +179,7 @@ export default function UpdateChecker() {
             )}
             {state === "ready" && (
               <button
+                type="button"
                 onClick={() => window.location.reload()}
                 className="btn btn-sm btn-success"
               >
@@ -187,6 +189,7 @@ export default function UpdateChecker() {
             )}
             {state === "error" && (
               <button
+                type="button"
                 onClick={checkForUpdates}
                 className="btn btn-sm btn-outline"
               >
@@ -200,7 +203,9 @@ export default function UpdateChecker() {
         {/* Dismiss button */}
         {(state === "available" || state === "error") && (
           <button
+            type="button"
             onClick={handleDismiss}
+            title="Dismiss"
             className="flex-shrink-0 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <X className="w-4 h-4 text-gray-400" />
@@ -268,6 +273,7 @@ export function UpdateSettings() {
         </div>
         
         <button
+          type="button"
           onClick={checkForUpdates}
           disabled={state === "checking"}
           className="btn btn-outline"
@@ -287,10 +293,4 @@ export function UpdateSettings() {
       </div>
     </div>
   );
-}
-
-#[cfg(test)]
-mod tests {
-    // Note: React component tests would go here using @testing-library/react
-    // For now, we rely on manual testing and TypeScript type checking
 }

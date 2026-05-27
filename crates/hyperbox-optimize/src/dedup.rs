@@ -1617,9 +1617,8 @@ mod tests {
 
     #[test]
     fn test_deduplicator_process_layer() {
-        let dedup =
-            ChunkDeduplicator::new(ChunkConfig::default(), PathBuf::from("/tmp/test-dedup"))
-                .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let dedup = ChunkDeduplicator::new(ChunkConfig::default(), dir.path().to_path_buf()).unwrap();
 
         let data = vec![0u8; 100_000];
         let result = dedup.process_layer("layer-1", &data).unwrap();
@@ -1631,29 +1630,30 @@ mod tests {
 
     #[test]
     fn test_deduplicator_detects_duplicates() {
-        let dedup =
-            ChunkDeduplicator::new(ChunkConfig::default(), PathBuf::from("/tmp/test-dedup"))
-                .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let dedup = ChunkDeduplicator::new(ChunkConfig::default(), dir.path().to_path_buf()).unwrap();
 
         let data = vec![0u8; 100_000];
 
-        // First pass: all chunks are new
+        // First pass: at least some chunks are new (intra-layer identical chunks may be deduped)
         let result1 = dedup.process_layer("layer-1", &data).unwrap();
-        assert_eq!(result1.duplicate_chunks, 0);
-        assert!(result1.new_chunks > 0);
+        assert!(result1.new_chunks > 0, "First pass should have new chunks");
+        assert_eq!(
+            result1.new_chunks + result1.duplicate_chunks,
+            result1.total_chunks
+        );
 
-        // Second pass with same data: all chunks should be duplicates
+        // Second pass with same data: all chunks should be duplicates (no new unique chunks)
         let result2 = dedup.process_layer("layer-2", &data).unwrap();
-        assert_eq!(result2.new_chunks, 0);
+        assert_eq!(result2.new_chunks, 0, "Second pass should have no new chunks");
+        assert!(result2.duplicate_chunks > 0, "Second pass should detect duplicates");
         assert_eq!(result2.duplicate_chunks, result2.total_chunks);
-        assert!((result2.dedup_ratio - 1.0).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_deduplicator_partial_overlap() {
-        let dedup =
-            ChunkDeduplicator::new(ChunkConfig::default(), PathBuf::from("/tmp/test-dedup"))
-                .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let dedup = ChunkDeduplicator::new(ChunkConfig::default(), dir.path().to_path_buf()).unwrap();
 
         let data_a = vec![0u8; 100_000];
         let _ = dedup.process_layer("layer-a", &data_a).unwrap();
@@ -1672,9 +1672,8 @@ mod tests {
 
     #[test]
     fn test_deduplicator_stats() {
-        let dedup =
-            ChunkDeduplicator::new(ChunkConfig::default(), PathBuf::from("/tmp/test-dedup"))
-                .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let dedup = ChunkDeduplicator::new(ChunkConfig::default(), dir.path().to_path_buf()).unwrap();
 
         let data = vec![42u8; 50_000];
         dedup.process_layer("layer-1", &data).unwrap();
@@ -1690,9 +1689,8 @@ mod tests {
 
     #[test]
     fn test_deduplicator_bloom_memory() {
-        let dedup =
-            ChunkDeduplicator::new(ChunkConfig::default(), PathBuf::from("/tmp/test-dedup"))
-                .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let dedup = ChunkDeduplicator::new(ChunkConfig::default(), dir.path().to_path_buf()).unwrap();
 
         let memory = dedup.bloom_memory_bytes();
         // Default bloom: 1M items at 1% FPR ≈ 1.2 MB

@@ -73,12 +73,13 @@ async fn main() -> Result<()> {
     state.start_psi_monitor();
 
     // Start services
-    let api_handle = tokio::spawn(api::serve(state.clone(), config.api_socket.clone()));
+    let api_handle = tokio::spawn(api::serve(state.clone(), config.api_socket.clone(), config.http_addr));
     let grpc_handle = tokio::spawn(grpc::serve(state.clone(), config.grpc_addr.clone()));
     let health_handle = tokio::spawn(health::monitor(state.clone()));
     let lifecycle_handle = tokio::spawn(lifecycle::manager(state.clone()));
 
     info!("HyperBox daemon started");
+    info!("  HTTP API: http://{}", config.http_addr);
     info!("  API socket: {:?}", config.api_socket);
     info!("  gRPC address: {}", config.grpc_addr);
 
