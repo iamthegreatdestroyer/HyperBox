@@ -27,7 +27,7 @@ RUN cargo build --release --bin hyperboxd --bin hb
 # ============================================================================
 # Stage 2: Runtime
 # ============================================================================
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
